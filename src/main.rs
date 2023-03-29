@@ -2,7 +2,7 @@ use chrono::{Datelike, NaiveDate};
 use std::{
     ffi::OsStr,
     fs::{self},
-    io::{Cursor, Write},
+    io::{BufWriter, Cursor, Write},
     path::{self, PathBuf},
 };
 
@@ -11,6 +11,7 @@ use glob::glob;
 use libraw::Processor;
 use rusqlite::*;
 use xxhash_rust::xxh3::Xxh3;
+use chrono::offset::Local as time;
 
 const SEED: u64 = 0xdeadbeef;
 
@@ -20,6 +21,18 @@ const DEBUG: bool = false;
 const DEBUG: bool = true;
 
 use clap::{Parser, Subcommand};
+
+#[macro_export]
+macro_rules! print_log {
+    ($log:ident, $($arg:tt)*) => {
+        let line = format!($($arg)*);
+        println!("{}",line);
+        $log.write(format!("{} >>> ", time::now()).as_bytes()).expect("msg_write_log");
+        $log.write(line.as_bytes()).expect("msg_write_log");
+        $log.write(b"\n").expect("msg_write_log");
+        $log.flush().expect("msg_flush_log");
+    };
+}
 
 /// Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
@@ -153,16 +166,6 @@ fn is_image_file(path: &path::Path) -> bool {
     }
 }
 
-// fn is_image_file(path: &path::Path) -> bool {
-//     if !path.is_file() {
-//       return false;
-//     }
-
-//     let matches_conditions = |s| { matches!(s, "3fr" | "arw" | "cr2" | "fff" | "mef" | "mos" |"iiq" | "nef" | "tif" | "tiff" | "raf" | "rw2" | "dng") };
-
-//     path.extension().and_then(OsStr::to_str).map(str::to_lowercase).map(|s| s.as_str(.cl()).map(matches_conditions).unwrap_or(false)
-//   }
-
 fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) {
     //write buf to path
     match fs::create_dir_all(path.parent().unwrap()) {
@@ -190,6 +193,7 @@ fn import_file(
     move_file: bool,
     insert: bool,
     con: &mut Connection,
+    log: &mut BufWriter<fs::File>,
 ) {
     let buf = fs::read(path).expect("read in");
     match get_file_info(&buf, path, import_path) {
@@ -202,17 +206,19 @@ fn import_file(
                     match insert_file_to_db(&metadata, con) {
                         Ok(_) => {
                             if DEBUG {
-                                println!("Inserted file: {}", metadata.db_path.display())
+                                println!("Inserted image: {}", metadata.db_path.display())
                             }
                         }
-                        Err(e) => println!("Error inserting file: {}", e),
+                        Err(e) => println!("Error inserting image: {}", e),
                     }
                 }
-                println!("{} -> {}", path.display(), metadata.db_path.display());
+                print_log!(log, "{} -> {}", path.display(), metadata.db_path.display());
+            } else {
+                print_log!(log, "Image already imported: {}", path.display());
             }
         }
         None => {
-            println!("Unable to hash file: {}", path.display());
+            print_log!(log, "Unable to hash file: {}\n", path.display());
         }
     }
 }
@@ -265,7 +271,12 @@ fn import_directory(
     move_file: bool,
     insert: bool,
     con: &mut Connection,
+    log: &mut BufWriter<fs::File>,
 ) {
+    if !path_to_import.is_dir() {
+        println!("{} is not a directory", path_to_import.display());
+        return;
+    }
     for entry in glob(
         path_to_import
             .join("**/*")
@@ -280,29 +291,34 @@ fn import_directory(
                 println!("path: {}", path.display());
             }
             if is_image_file(&path) {
-                import_file(&path, &import_path, move_file, insert, con);
+                import_file(&path, &import_path, move_file, insert, con, log);
             }
         } else {
-            println!("Error reading path {}: {}", &path_to_import.display(), entry.unwrap_err());
+            print_log!(
+                log,
+                "Error reading path {}: {}",
+                &path_to_import.display(),
+                entry.unwrap_err()
+            );
         }
     }
+    log.flush().expect("flush log");
 }
 
-
-fn verify_db(
-    con: &mut Connection,
-) {
+fn verify_db(con: &mut Connection) {
     let mut stmt = con.prepare("SELECT * FROM photodb").unwrap();
-    let rows = stmt.query_map([], |row| {
-        Ok(Photo {
-            hash: row.get(0)?,
-            og_path: PathBuf::from(row.get::<_, String>(1)?),
-            db_path: PathBuf::from(row.get::<_, String>(2)?),
-            year: row.get(3)?,
-            month: row.get(4)?,
-            model: row.get(5)?,
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(Photo {
+                hash: row.get(0)?,
+                og_path: PathBuf::from(row.get::<_, String>(1)?),
+                db_path: PathBuf::from(row.get::<_, String>(2)?),
+                year: row.get(3)?,
+                month: row.get(4)?,
+                model: row.get(5)?,
+            })
         })
-    }).unwrap();
+        .unwrap();
 
     for row in rows {
         let photo = row.unwrap();
@@ -311,34 +327,43 @@ fn verify_db(
                 let buf = fs::read(&photo.db_path).expect("read in");
                 let hash = read_hash_image(&buf);
                 if hash != photo.hash {
-                    println!("Hash mismatch on {} : {} file != {} db", &photo.db_path.display(), hash, photo.hash);
+                    println!(
+                        "Hash mismatch on {} : {:#x} file != {:#x} db",
+                        &photo.db_path.display(),
+                        hash,
+                        photo.hash
+                    );
                 } else {
-                    println!("Verified: {} -> {}", &photo.db_path.display(), hash);
+                    println!("Verified: {} -> {:#x}", &photo.db_path.display(), hash);
                 }
             }
             false => {
                 println!("File not found: {}", photo.db_path.display());
             }
-        } 
-
+        }
     }
 }
-
 
 fn main() {
     let args = Cli::parse();
     let mut conn = Connection::open(args.database).unwrap();
+
     if args.create {
         create_table(&mut conn);
     }
     match &args.mode {
         Mode::Import { path } => {
+            let log_file =
+                fs::File::create(&path.clone().expect("path").join(format!("photodb_import_{}.log", time::now())))
+                    .expect("create log file");
+            let mut log = BufWriter::new(log_file);
             import_directory(
                 &path.clone().expect("path"),
                 &args.import_path,
                 args.move_files,
                 args.insert,
                 &mut conn,
+                &mut log,
             );
         }
         Mode::Verify => {
