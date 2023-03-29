@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build Release
-      run: cargo build --release
-    - uses: actions/upload-artifact@v3.1.2
-    - name: Upload a Build Artifact
-      with:
-        name: photodb
-        path: target/release/photodb
+      - uses: actions/checkout@v3
+      - name: Build Release
+        run: cargo build --release
+      - uses: actions/upload-artifact@v3.1.2
+      - name: Upload a Build Artifact
+        with:
+          name: photodb
+          path: target/release/photodb
