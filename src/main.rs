@@ -6,12 +6,12 @@ use std::{
     path::{self, PathBuf},
 };
 
+use chrono::offset::Local as time;
 use exif::{In, Tag};
 use glob::glob;
 use libraw::Processor;
 use rusqlite::*;
 use xxhash_rust::xxh3::Xxh3;
-use chrono::offset::Local as time;
 
 const SEED: u64 = 0xdeadbeef;
 
@@ -353,9 +353,13 @@ fn main() {
     }
     match &args.mode {
         Mode::Import { path } => {
-            let log_file =
-                fs::File::create(&path.clone().expect("path").join(format!("photodb_import_{}.log", time::now())))
-                    .expect("create log file");
+            let log_file = fs::File::create(
+                &path
+                    .clone()
+                    .expect("path")
+                    .join(format!("photodb_import_{}.log", time::now())),
+            )
+            .expect("create log file");
             let mut log = BufWriter::new(log_file);
             import_directory(
                 &path.clone().expect("path"),
