@@ -11,5 +11,13 @@ clap = { version = "4.0", features = ["derive"] }
 glob = "0.3.1"
 kamadak-exif = "0.5.5"
 libraw-rs = "0.0.4"
+rayon = "1.7.0"
 rusqlite = { version = "0.29.0", features = ["bundled", "i128_blob"] }
 xxhash-rust = {version = "0.8.6", features= ["xxh3", "const_xxh3"]}
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+
+# [build-dependencies]
+# bindgen = "0.64.0"

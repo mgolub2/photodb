@@ -1,15 +1,19 @@
+#![feature(thread_id_value)]
 use chrono::{Datelike, NaiveDate};
 use std::{
+    error::Error,
     ffi::OsStr,
     fs::{self},
     io::{BufWriter, Cursor, Write},
     path::{self, PathBuf},
+    thread,
 };
 
 use chrono::offset::Local as time;
 use exif::{In, Tag};
-use glob::glob;
+use glob::{glob_with, MatchOptions};
 use libraw::Processor;
+use rayon::prelude::*;
 use rusqlite::*;
 use xxhash_rust::xxh3::Xxh3;
 
@@ -54,7 +58,7 @@ struct Cli {
     /// The name of the database to use
     #[clap(short, long, default_value = ":memory:")]
     database: PathBuf,
-    //// Create the database
+    /// Create the database
     #[clap(short, long, default_value_t = false)]
     create: bool,
 }
@@ -66,7 +70,7 @@ enum Mode {
         /// The path to the file or directory to read
         path: Option<PathBuf>,
     },
-    //// Verify the raw file using the database
+    /// Verify the raw image file hashes
     Verify,
 }
 
@@ -85,9 +89,10 @@ fn read_hash_image(buf: &Vec<u8>) -> i128 {
         Ok(decoded) => {
             let mut xxh: Xxh3 = Xxh3::with_seed(SEED);
             for u16 in decoded.iter() {
-                let u8_bytes = u16.to_be_bytes();
-                let u8_arr = [u8_bytes[0], u8_bytes[1]];
-                xxh.update(&u8_arr);
+                match Some(u16.to_le_bytes()) {
+                    Some(u8_bytes) => xxh.update(&u8_bytes),
+                    None => continue,
+                }
             }
             return xxh.digest128() as i128;
         }
@@ -96,6 +101,24 @@ fn read_hash_image(buf: &Vec<u8>) -> i128 {
             return 0;
         }
     }
+}
+
+fn get_date(exif: &exif::Exif) -> NaiveDate {
+    let exif_date_keys = [Tag::DateTimeOriginal, Tag::DateTime];
+    //let format_strs = ["%Y-%m-%d %H:%M:%S", ];
+    for key in exif_date_keys.iter() {
+        if let Some(date) = exif.get_field(*key, In::PRIMARY) {
+            if DEBUG {
+                println!("Found date: {}", date.display_value().to_string());
+            }
+            return NaiveDate::parse_from_str(
+                &date.display_value().to_string(),
+                "%Y-%m-%d %H:%M:%S",
+            )
+            .expect("date");
+        }
+    }
+    panic!("No date found!");
 }
 
 fn get_file_info(buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf) -> Option<Photo> {
@@ -118,13 +141,8 @@ fn get_file_info(buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf) -> Option
         .replace(",", "")
         .trim()
         .to_string();
-    let date = exif
-        .get_field(Tag::DateTimeOriginal, In::PRIMARY)
-        .expect("date")
-        .display_value()
-        .to_string();
-    let year_month_day = NaiveDate::parse_from_str(&date, "%Y-%m-%d %H:%M:%S").expect("date");
-    let model_date = (year_month_day.year(), year_month_day.month());
+    let date = get_date(&exif);
+    let model_date = (date.year(), date.month());
 
     if DEBUG {
         println!("\thash: {}", hash);
@@ -166,27 +184,25 @@ fn is_image_file(path: &path::Path) -> bool {
     }
 }
 
-fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) {
+fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std::io::Error> {
     //write buf to path
     match fs::create_dir_all(path.parent().unwrap()) {
-        Ok(_) => match fs::File::create(path) {
-            Ok(mut file) => {
-                file.write_all(buf).expect("write file");
-            }
-            Err(e) => {
-                println!("Error writing file: {}", e);
-            }
-        },
+        Ok(_) => {
+            let mut file = fs::File::create(path)?;
+            return file.write_all(buf);
+        }
         Err(e) => {
             println!(
                 "Error creating directory {}: {}",
                 path.parent().unwrap().display(),
                 e
             );
+            return Err(e);
         }
     }
 }
 
+/*
 fn import_file(
     path: &PathBuf,
     import_path: &PathBuf,
@@ -222,6 +238,7 @@ fn import_file(
         }
     }
 }
+*/
 
 fn create_table(con: &mut Connection) {
     let query = "
@@ -270,43 +287,99 @@ fn import_directory(
     import_path: &PathBuf,
     move_file: bool,
     insert: bool,
-    con: &mut Connection,
+    database: &PathBuf,
     log: &mut BufWriter<fs::File>,
-) {
+) -> Result<(), Box<dyn Error>> {
     if !path_to_import.is_dir() {
         println!("{} is not a directory", path_to_import.display());
-        return;
+        return Err("Not a directory".into());
     }
-    for entry in glob(
+    let options: MatchOptions = Default::default();
+
+    let img_files: Vec<_> = glob_with(
         path_to_import
             .join("**/*")
-            .into_os_string()
+            .as_os_str()
             .to_str()
             .expect("join"),
-    )
-    .expect("bad pattern")
-    {
-        if let Ok(path) = entry {
+        options,
+    )?
+    .filter_map(|x| x.ok())
+    .filter_map(|path| is_image_file(&path).then_some(path))
+    .collect();
+
+    print_log!(log, "Importing {} files", img_files.len());
+    img_files.par_iter().for_each(|path| {
+        let buf = fs::read(&path).expect("read in");
+        let photo = get_file_info(&buf, &path, import_path);
+        let thread_num = thread::current().id().as_u64();
+        if let Some(metadata) = photo {
+            let mut conn = Connection::open(database).unwrap();
             if DEBUG {
-                println!("path: {}", path.display());
+                println!("Checking {}... \t(thread#{})", path.display(), thread_num);
             }
-            if is_image_file(&path) {
-                import_file(&path, &import_path, move_file, insert, con, log);
+            let mut do_insert = insert;
+            if !is_imported(metadata.hash, &mut conn) {
+                if move_file {
+                    match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
+                        Ok(_) => {
+                            if DEBUG {
+                                println!(
+                                    "Moved image: {} \t(thread#{})",
+                                    metadata.db_path.display(),
+                                    thread_num
+                                )
+                            }
+                        }
+                        Err(e) => {
+                            println!("Error moving image: {} \t(thread#{})", e, thread_num);
+                            do_insert = false;
+                        }
+                    }
+                }
+                if do_insert {
+                    match insert_file_to_db(&metadata, &mut conn) {
+                        Ok(_) => {
+                            if DEBUG {
+                                println!(
+                                    "Inserted image: {} \t(thread#{})",
+                                    metadata.db_path.display(),
+                                    thread_num
+                                )
+                            }
+                        }
+                        Err(e) => {
+                            println!("Error inserting image: {} \t(thread#{})", e, thread_num)
+                        }
+                    }
+                }
+                println!("{} -> {}", path.display(), metadata.db_path.display());
+            } else {
+                println!(
+                    "Image already imported: {} \t(thread#{})",
+                    path.display(),
+                    thread_num
+                );
             }
         } else {
-            print_log!(
-                log,
-                "Error reading path {}: {}",
-                &path_to_import.display(),
-                entry.unwrap_err()
+            println!(
+                "Unable to hash file: {} \t(thread#{})\n",
+                path.display(),
+                thread_num
             );
         }
-    }
+    });
+    // .filter_map(|x| Some(x))
+    // .collect();
+    //img_hashes.iter().for_each(|x| println!("{:?}", x));
+
     log.flush().expect("flush log");
+    Ok(())
 }
 
-fn verify_db(con: &mut Connection) {
-    let mut stmt = con.prepare("SELECT * FROM photodb").unwrap();
+fn verify_db(database: &PathBuf) {
+    let conn = Connection::open(database).unwrap();
+    let mut stmt = conn.prepare("SELECT * FROM photodb").unwrap();
     let rows = stmt
         .query_map([], |row| {
             Ok(Photo {
@@ -319,13 +392,18 @@ fn verify_db(con: &mut Connection) {
             })
         })
         .unwrap();
-
-    for row in rows {
-        let photo = row.unwrap();
-        match photo.db_path.exists() {
+    let photos = rows.collect::<Result<Vec<_>, _>>().unwrap();
+    photos
+        .par_iter()
+        .for_each(|photo| match photo.db_path.exists() {
             true => {
-                let buf = fs::read(&photo.db_path).expect("read in");
-                let hash = read_hash_image(&buf);
+                let hash = match fs::read(&photo.db_path) {
+                    Ok(buf) => read_hash_image(&buf),
+                    Err(e) => {
+                        println!("Error reading file: {}", e);
+                        0
+                    }
+                };
                 if hash != photo.hash {
                     println!(
                         "Hash mismatch on {} : {:#x} file != {:#x} db",
@@ -334,21 +412,26 @@ fn verify_db(con: &mut Connection) {
                         photo.hash
                     );
                 } else {
-                    println!("Verified: {} -> {:#x}", &photo.db_path.display(), hash);
+                    println!(
+                        "verified: {} -> {:#x} \t(thread#{})",
+                        photo.db_path.display(),
+                        hash,
+                        thread::current().id().as_u64()
+                    );
                 }
             }
             false => {
                 println!("File not found: {}", photo.db_path.display());
             }
-        }
-    }
+        });
+    println!("Done verifying {} photos", photos.len());
 }
 
 fn main() {
     let args = Cli::parse();
-    let mut conn = Connection::open(args.database).unwrap();
 
     if args.create {
+        let mut conn = Connection::open(&args.database).unwrap();
         create_table(&mut conn);
     }
     match &args.mode {
@@ -361,17 +444,20 @@ fn main() {
             )
             .expect("create log file");
             let mut log = BufWriter::new(log_file);
-            import_directory(
+            match import_directory(
                 &path.clone().expect("path"),
                 &args.import_path,
                 args.move_files,
                 args.insert,
-                &mut conn,
+                &args.database,
                 &mut log,
-            );
+            ) {
+                Ok(_) => println!("Imported files"),
+                Err(e) => println!("Error importing files: {}", e),
+            }
         }
         Mode::Verify => {
-            verify_db(&mut conn);
+            verify_db(&args.database);
         }
     }
 }
