@@ -1,21 +1,104 @@
 #![feature(thread_id_value)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+pub struct RawImage {
+    //libraw_data: *mut libraw_data_t,
+    raw_data: Vec<u16>,
+}
+
+impl RawImage {
+    pub fn new(buf: &[u8]) -> Self{
+        let libraw_data = unsafe { libraw_init(0) };
+        match unsafe {
+                    libraw_open_buffer(libraw_data, buf.as_ptr() as *const _, buf.len())
+                } {
+                    LibRaw_errors_LIBRAW_SUCCESS => {
+                        match unsafe { libraw_unpack(libraw_data) } {
+                            LibRaw_errors_LIBRAW_SUCCESS => {
+                                let raw_image = unsafe { (*libraw_data).rawdata.raw_image };
+                                let raw_image_size = unsafe { (*libraw_data).sizes.iwidth as usize * (*libraw_data).sizes.iheight as usize };
+                                let raw_data = unsafe { Vec::from_raw_parts(raw_image as *mut u16, raw_image_size, raw_image_size) };
+                                unsafe { libraw_close(libraw_data) };
+                                return Self { raw_data }
+                            }
+                            _ => panic!("Unpack failed"),
+                        }
+                    },
+                    _ => panic!("Open failed"),
+                }
+        //Self { libraw_data, raw_data }
+    }
+
+    // fn open(&mut self, buf: &[u8]) -> Result<&str, Box<dyn Error>> {
+    //     match unsafe {
+    //         libraw_open_buffer(self.libraw_data, buf.clone().as_ptr() as *const _, buf.len())
+    //     } {
+    //         LibRaw_errors_LIBRAW_SUCCESS => {
+    //             match unsafe { libraw_unpack(self.libraw_data) } {
+    //                 LibRaw_errors_LIBRAW_SUCCESS => {
+    //                     self.get_raw_as_vec()?;
+    //                     return Ok("Success");
+    //                 }
+    //                 _ => Err("Unpack failed".into()),
+    //             }
+    //         },
+    //         _ => Err("Open failed".into()),
+    //     }
+    // }
+
+    // fn get_raw_as_vec(&mut self) -> Result<(), Box<dyn Error>> {
+    //     let raw_image = unsafe { (*self.libraw_data).rawdata.raw_image };
+    //     let raw_image_size = unsafe { (*self.libraw_data).sizes.iwidth as usize * (*self.libraw_data).sizes.iheight as usize };
+    //     let raw_image_slice = unsafe { slice::from_raw_parts(raw_image, raw_image_size) };
+    //     self.raw_data.append(&mut raw_image_slice.to_vec());
+    //     Ok(())
+    // }
+
+}
+
+// impl Drop for RawImage {
+//     fn drop(&mut self) {
+//         unsafe { libraw_close(self.libraw_data) }
+//     }
+// }
+
+// impl Deref for RawImage {
+//     type Target = [u16];
+
+//     fn deref(&self) -> &Self::Target {
+//         unsafe {
+//             slice::from_raw_parts(
+//                 (*self.libraw_data).rawdata.raw_image,
+//                 (*self.libraw_data).sizes.width as usize * (*self.libraw_data).sizes.height as usize,
+//             )
+//         }
+//     }
+// }
+
+
 use chrono::{Datelike, NaiveDate};
+use core::slice;
 use std::{
     error::Error,
     ffi::OsStr,
     fs::{self},
     io::{BufWriter, Cursor, Write},
     path::{self, PathBuf},
-    thread,
+    thread, ops::Deref,
 };
 
-use chrono::offset::Local as time;
+use chrono::offset::Local as rstime;
 use exif::{In, Tag};
 use glob::{glob_with, MatchOptions};
-use libraw::Processor;
+//use libraw::Processor;
 use rayon::prelude::*;
 use rusqlite::*;
 use xxhash_rust::xxh3::Xxh3;
+
 
 const SEED: u64 = 0xdeadbeef;
 
@@ -31,7 +114,7 @@ macro_rules! print_log {
     ($log:ident, $($arg:tt)*) => {
         let line = format!($($arg)*);
         println!("{}",line);
-        $log.write(format!("{} >>> ", time::now()).as_bytes()).expect("msg_write_log");
+        $log.write(format!("{} >>> ", rstime::now()).as_bytes()).expect("msg_write_log");
         $log.write(line.as_bytes()).expect("msg_write_log");
         $log.write(b"\n").expect("msg_write_log");
         $log.flush().expect("msg_flush_log");
@@ -84,23 +167,33 @@ struct Photo {
 }
 
 fn read_hash_image(buf: &Vec<u8>) -> i128 {
-    let processor = Processor::new();
-    match processor.decode(&buf) {
-        Ok(decoded) => {
+    //return 0;
+    let image = RawImage::new(buf);
+    //match RawImage::new(buf) {
+    //    Ok(image) => {
             let mut xxh: Xxh3 = Xxh3::with_seed(SEED);
-            for u16 in decoded.iter() {
-                match Some(u16.to_le_bytes()) {
-                    Some(u8_bytes) => xxh.update(&u8_bytes),
-                    None => continue,
-                }
-            }
-            return xxh.digest128() as i128;
-        }
-        Err(e) => {
-            println!("\tError: {}", e);
-            return 0;
-        }
+            // match image {
+            //     Ok(raw) => {
+    for u16 in image.raw_data.iter() {
+        xxh.update(&u16.to_le_bytes());
     }
+    return xxh.digest128() as i128;
+            //     }
+            //     Err(e) => {
+            //         println!("\tError: {}", e);
+            //         return 0;
+            //     }
+            // }
+            // // for u16 in.iter() {
+            // //     xxh.update(&u16.());
+            // // }
+            // // return xxh.digest128() as i128;
+        //}
+        // Err(e) => {
+        //     println!("\tError: {}", e);
+        //     return 0;
+        // }
+    //}
 }
 
 fn get_date(exif: &exif::Exif) -> NaiveDate {
@@ -122,6 +215,7 @@ fn get_date(exif: &exif::Exif) -> NaiveDate {
 }
 
 fn get_file_info(buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf) -> Option<Photo> {
+    println!("Getting file info for: {} (thread#{})", path.display(), thread::current().id().as_u64());
     let hash = read_hash_image(&buf);
     if hash == 0 {
         return None;
@@ -175,8 +269,7 @@ fn is_image_file(path: &path::Path) -> bool {
             .to_lowercase()
             .as_str()
         {
-            "3fr" | "arw" | "cr2" | "fff" | "mef" | "mos" | "iiq" | "nef" | "tif" | "tiff"
-            | "raf" | "rw2" | "dng" => true,
+            "3fr" | "arw" | "cr2" | "fff" | "mef" | "mos" | "iiq" | "nef" | "raf" | "rw2" | "dng" => true,
             _ => false,
         };
     } else {
@@ -201,44 +294,6 @@ fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std::io::Error
         }
     }
 }
-
-/*
-fn import_file(
-    path: &PathBuf,
-    import_path: &PathBuf,
-    move_file: bool,
-    insert: bool,
-    con: &mut Connection,
-    log: &mut BufWriter<fs::File>,
-) {
-    let buf = fs::read(path).expect("read in");
-    match get_file_info(&buf, path, import_path) {
-        Some(metadata) => {
-            if !is_imported(metadata.hash, con) {
-                if move_file {
-                    write_to_path(buf.clone().as_mut(), &metadata.db_path);
-                }
-                if insert {
-                    match insert_file_to_db(&metadata, con) {
-                        Ok(_) => {
-                            if DEBUG {
-                                println!("Inserted image: {}", metadata.db_path.display())
-                            }
-                        }
-                        Err(e) => println!("Error inserting image: {}", e),
-                    }
-                }
-                print_log!(log, "{} -> {}", path.display(), metadata.db_path.display());
-            } else {
-                print_log!(log, "Image already imported: {}", path.display());
-            }
-        }
-        None => {
-            print_log!(log, "Unable to hash file: {}\n", path.display());
-        }
-    }
-}
-*/
 
 fn create_table(con: &mut Connection) {
     let query = "
@@ -289,7 +344,7 @@ fn import_directory(
     insert: bool,
     database: &PathBuf,
     log: &mut BufWriter<fs::File>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<u64, Box<dyn Error>> {
     if !path_to_import.is_dir() {
         println!("{} is not a directory", path_to_import.display());
         return Err("Not a directory".into());
@@ -309,7 +364,7 @@ fn import_directory(
     .collect();
 
     print_log!(log, "Importing {} files", img_files.len());
-    img_files.par_iter().for_each(|path| {
+    let imported_count = img_files.par_iter().map(|path| {
         let buf = fs::read(&path).expect("read in");
         let photo = get_file_info(&buf, &path, import_path);
         let thread_num = thread::current().id().as_u64();
@@ -368,13 +423,9 @@ fn import_directory(
                 thread_num
             );
         }
-    });
-    // .filter_map(|x| Some(x))
-    // .collect();
-    //img_hashes.iter().for_each(|x| println!("{:?}", x));
-
+    }).count();
     log.flush().expect("flush log");
-    Ok(())
+    Ok(imported_count as u64)
 }
 
 fn verify_db(database: &PathBuf) {
@@ -440,7 +491,7 @@ fn main() {
                 &path
                     .clone()
                     .expect("path")
-                    .join(format!("photodb_import_{}.log", time::now())),
+                    .join(format!("photodb_import_{}.log", rstime::now())),
             )
             .expect("create log file");
             let mut log = BufWriter::new(log_file);
@@ -452,7 +503,7 @@ fn main() {
                 &args.database,
                 &mut log,
             ) {
-                Ok(_) => println!("Imported files"),
+                Ok(v) => println!("Imported {} files", v),
                 Err(e) => println!("Error importing files: {}", e),
             }
         }
