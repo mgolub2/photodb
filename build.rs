@@ -55,8 +55,7 @@ fn main() {
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search=libraw/libraw");
 
-    // Tell cargo to tell rustc to link the system bzip2
-    // shared library.
+    // Tell cargo to tell rustc to link the shared library.
     println!("cargo:rustc-link-lib=raw");
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
@@ -71,8 +70,8 @@ fn main() {
         .header("wrapper.h")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .parse_callbacks(Box::new(IgnoreMacros::new()))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         // Longdouble creates warnings about 16-bit numbers, good to ignore if relevant
         .blocklist_function("strtold")
         // Finish the builder and generate the bindings.
