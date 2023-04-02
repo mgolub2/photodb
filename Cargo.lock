@@ -583,6 +583,7 @@ dependencies = [
  "clap",
  "glob",
  "kamadak-exif",
+ "libc",
  "rayon",
  "rusqlite",
  "xxhash-rust",
