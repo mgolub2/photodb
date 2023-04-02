@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 fn main() {
     // Tell cargo to look for shared libraries in the specified directory
-    println!("cargo:rustc-link-search=LibRaw-0.21.1/libraw");
+    println!("cargo:rustc-link-search=libraw/libraw");
 
     // Tell cargo to tell rustc to link the system bzip2
     // shared library.
