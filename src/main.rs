@@ -8,12 +8,11 @@ mod raw;
 
 use clap::Parser;
 use cli::{Cli, Mode};
-use photo::Photo;
-use std::{error::Error, fs, path::PathBuf};
-
 use glob::{glob_with, MatchOptions};
+use photo::Photo;
 use rayon::prelude::*;
 use rusqlite::*;
+use std::{error::Error, fs, path::PathBuf};
 
 use crate::image::{get_file_info, is_image_file, write_to_path};
 
