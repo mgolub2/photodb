@@ -21,16 +21,6 @@ fn build(out_dir: &Path) {
     let mut libraw = cc::Build::new();
     libraw.cpp(true);
     libraw.include(LIBRAW_DIR);
-    // glob(PathBuf::from(LIBRAW_DIR)
-    //         .join("**/*.cpp")
-    //         .as_os_str()
-    //         .to_str()
-    //         .expect("join")
-    // ).expect("glob")
-    // .filter_map(|x| x.ok())
-    // .for_each(|path| {
-    //     libraw.file(path);
-    // });
 
     libraw.file("libraw/src/decoders/canon_600.cpp");
     libraw.file("libraw/src/decoders/crx.cpp");
