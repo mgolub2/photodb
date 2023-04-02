@@ -6,7 +6,6 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 pub struct RawImage {
-    //libraw_data: *mut libraw_data_t,
     raw_data: Vec<u16>,
 }
 
@@ -60,18 +59,6 @@ const DEBUG: bool = false;
 const DEBUG: bool = true;
 
 use clap::{Parser, Subcommand};
-
-// #[macro_export]
-// macro_rules! print_log {
-//     ($log:ident, $($arg:tt)*) => {
-//         let line = format!($($arg)*);
-//         println!("{}",line);
-//         $log.write(format!("{} >>> ", rstime::now()).as_bytes()).expect("msg_write_log");
-//         $log.write(line.as_bytes()).expect("msg_write_log");
-//         $log.write(b"\n").expect("msg_write_log");
-//         $log.flush().expect("msg_flush_log");
-//     };
-// }
 
 /// Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
@@ -301,7 +288,6 @@ fn import_directory(
     move_file: bool,
     insert: bool,
     database: &PathBuf,
-    //log: &mut BufWriter<fs::File>,
 ) -> Result<u64, Box<dyn Error>> {
     if !path_to_import.is_dir() {
         println!("{} is not a directory", path_to_import.display());
@@ -395,7 +381,6 @@ fn import_directory(
             }
         })
         .count();
-    //log.flush().expect("flush log");
     Ok(imported_count as u64)
 }
 
@@ -458,14 +443,6 @@ fn main() {
     }
     match &args.mode {
         Mode::Import { path } => {
-            // let log_file = fs::File::create(
-            //     &path
-            //         .clone()
-            //         .expect("path")
-            //         .join(format!("photodb_import_{}.log", rstime::now())),
-            // )
-            // .expect("create log file");
-            //let mut log = BufWriter::new(log_file);
             match import_directory(
                 &path.clone().expect("path"),
                 &args.import_path,
