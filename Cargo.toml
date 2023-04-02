@@ -20,3 +20,5 @@ debug = true
 
 [build-dependencies]
 bindgen = "0.64.0"
+cc = { version = "1.0.79", features = ["parallel"] }
+glob = "0.3.1"
