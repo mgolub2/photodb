@@ -160,10 +160,19 @@ impl IgnoreMacros {
 }
 
 fn bindings(out_dir: &Path) {
-    let bindings = bindgen::Builder::default()
-        .header("libraw/libraw/libraw.h")
+
+    //detect current platform
+    let target = env::var("TARGET").unwrap();
+
+    let mut bindings = bindgen::Builder::default()        
         .use_core()
-        .generate_comments(true)
+        .generate_comments(true);
+
+    if target.contains("linux") {
+        bindings = bindings.ctypes_prefix("libc");
+    }
+    
+    let builder = bindings.header("libraw/libraw/libraw.h")
         .parse_callbacks(Box::new(IgnoreMacros::new()))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         // API improvements
@@ -257,7 +266,7 @@ fn bindings(out_dir: &Path) {
         .generate()
         .expect("Unable to generate bindings");
 
-    bindings
+    builder
         .write_to_file(out_dir.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 }
