@@ -170,7 +170,6 @@ impl IgnoreMacros {
 fn bindings(out_dir: &Path) {
     bindgen::Builder::default()
         .use_core()
-        .ctypes_prefix("cty")
         .generate_comments(true)
         .header("libraw/libraw/libraw.h")
         .parse_callbacks(Box::new(IgnoreMacros::new()))
