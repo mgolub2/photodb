@@ -4,9 +4,6 @@ use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 
-//, path::PathBuf};
-//use glob::{glob};
-
 const LIBRAW_DIR: &str = "libraw/";
 
 const LIBRAW_FILES: [&str; 75] = [
@@ -110,6 +107,90 @@ const IGNORE_MACROS: [&str; 20] = [
     "IPPORT_RESERVED",
 ];
 
+const DENY_FUNCS: [&str; 81] = [
+    "acoshl",
+    "acosl",
+    "asinhl",
+    "asinl",
+    "atan2l",
+    "atanhl",
+    "atanl",
+    "cbrtl",
+    "ceill",
+    "copysignl",
+    "coshl",
+    "cosl",
+    "dreml",
+    "ecvt_r",
+    "erfcl",
+    "erfl",
+    "exp2l",
+    "expl",
+    "expm1l",
+    "fabsl",
+    "fcvt_r",
+    "fdiml",
+    "finitel",
+    "floorl",
+    "fmal",
+    "fmaxl",
+    "fminl",
+    "fmodl",
+    "frexpl",
+    "gammal",
+    "hypotl",
+    "ilogbl",
+    "isinfl",
+    "isnanl",
+    "j0l",
+    "j1l",
+    "jnl",
+    "ldexpl",
+    "lgammal",
+    "lgammal_r",
+    "llrintl",
+    "llroundl",
+    "log10l",
+    "log1pl",
+    "log2l",
+    "logbl",
+    "logl",
+    "lrintl",
+    "lroundl",
+    "modfl",
+    "nanl",
+    "nearbyintl",
+    "nextafterl",
+    "nexttoward",
+    "nexttowardf",
+    "nexttowardl",
+    "powl",
+    "qecvt",
+    "qecvt_r",
+    "qfcvt",
+    "qfcvt_r",
+    "qgcvt",
+    "remainderl",
+    "remquol",
+    "rintl",
+    "roundl",
+    "scalbl",
+    "scalblnl",
+    "scalbnl",
+    "significandl",
+    "sinhl",
+    "sinl",
+    "sqrtl",
+    "strtold",
+    "tanhl",
+    "tanl",
+    "tgammal",
+    "truncl",
+    "y0l",
+    "y1l",
+    "ynl",
+];
+
 fn main() {
     let out_dir_ = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir_);
@@ -168,7 +249,7 @@ impl IgnoreMacros {
 }
 
 fn bindings(out_dir: &Path) {
-    bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .use_core()
         .generate_comments(true)
         .header("libraw/libraw/libraw.h")
@@ -178,8 +259,11 @@ fn bindings(out_dir: &Path) {
         .derive_eq(true)
         .size_t_is_usize(true)
         // these are never part of the API
-        .blocklist_function("_.*")
-        .generate()
+        .blocklist_function("_.*");
+    for func in DENY_FUNCS.iter() {
+        builder = builder.blocklist_function(func);
+    }
+    builder.generate()
         .expect("Unable to generate bindings")
         .write_to_file(out_dir.join("bindings.rs"))
         .expect("Couldn't write bindings!");
