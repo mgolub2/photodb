@@ -144,8 +144,8 @@ fn build(out_dir: &Path) {
         "cargo:rustc-link-search=native={}",
         out_dir.join("lib").display()
     );
-    println!("cargo:rustc-link-lib=c++");
-    println!("cargo:rustc-link-lib=static=raw");
+    //println!("cargo:rustc-link-lib=c++");
+    println!("cargo:rustc-link-lib=static=raw_r");
 }
 
 #[derive(Debug)]
