@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// Search for a pattern in a file and display the lines that contain it.
+/// Simple photo database management tool. Pixel content based depduplication via xxhash and libraw.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
