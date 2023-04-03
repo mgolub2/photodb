@@ -219,7 +219,7 @@ fn build(out_dir: &Path) {
     libraw.flag("-Wno-deprecated-declarations");
     libraw.flag("-pthread");
     libraw.static_flag(true);
-    libraw.compile("raw_r");
+    libraw.compile("raw");
 
     println!(
         "cargo:rustc-link-search=native={}",
