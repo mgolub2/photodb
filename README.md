@@ -13,7 +13,7 @@ A simple rust program for managing raw images.
 
 ## Usage
 ```plaintext
-Search for a pattern in a file and display the lines that contain it
+Simple photo database management tool. Pixel content based depduplication via xxhash and libraw
 
 Usage: photodb [OPTIONS] <COMMAND>
 
@@ -26,10 +26,11 @@ Options:
       --import-path <IMPORT_PATH>  The database root to move files into [default: photodb]
   -m, --move-files                 Move the files to the database root
   -i, --insert                     Import the files into the database, checking for duplicates
-  -d, --database <DATABASE>        The name of the database to use [default: :memory:]
+  -d, --database <DATABASE>        The name of the database to use [default: .photodb/photo.db]
   -c, --create                     Create the database
   -h, --help                       Print help
   -V, --version                    Print version
+
 ```
 
 ## Build and Install
