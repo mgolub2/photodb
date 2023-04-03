@@ -1,4 +1,5 @@
 # PhotoDB
+[![Build and Publish Release](https://github.com/mgolub2/photodb/actions/workflows/rust.yml/badge.svg)](https://github.com/mgolub2/photodb/actions/workflows/rust.yml)
 
 A simple rust program for managing raw images.
 
