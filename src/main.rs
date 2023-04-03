@@ -146,6 +146,10 @@ fn main() {
     let args = Cli::parse();
 
     if args.create {
+        // create the path if it doesn't exist
+        if !args.database.exists() {
+            fs::create_dir_all(&args.database.parent().unwrap()).unwrap();
+        }
         let mut conn = Connection::open(&args.database).unwrap();
         db::create_table(&mut conn);
     }
