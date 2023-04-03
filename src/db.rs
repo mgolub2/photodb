@@ -9,7 +9,7 @@ pub(crate) fn create_table(con: &mut Connection) {
 
     match con.execute(query, ()) {
         Ok(_) => println!("Created database table for photodb."),
-        Err(e) => println!("Error creating table: {}", e),
+        Err(e) => println!("Error: creating table: {}", e),
     }
 }
 
