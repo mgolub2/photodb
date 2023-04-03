@@ -19,7 +19,7 @@ pub(crate) struct Cli {
     #[clap(short, long, default_value_t = false)]
     pub(crate) insert: bool,
     /// The name of the database to use
-    #[clap(short, long, default_value = "photo.db")]
+    #[clap(short, long, default_value = "~/.photodb/photos.db")]
     pub(crate) database: PathBuf,
     /// Create the database
     #[clap(short, long, default_value_t = false)]
