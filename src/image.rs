@@ -1,4 +1,5 @@
 use std::{
+    error::Error,
     ffi::OsStr,
     fs,
     io::{Cursor, Write},
@@ -24,11 +25,17 @@ pub(crate) fn get_date(exif: &exif::Exif) -> Result<NaiveDate, ParseError> {
     return NaiveDate::parse_from_str("fail", "%Y-%m-%d %H:%M:%S");
 }
 
-pub(crate) fn get_file_info(buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf) -> Option<Photo> {
-    let hash = hash::read_hash_image(&buf);
-    if hash == 0 {
-        return None;
-    }
+pub(crate) fn get_file_info(
+    buf: &Vec<u8>,
+    path: &PathBuf,
+    import_path: &PathBuf,
+) -> Result<Photo, Box<dyn Error>> {
+    let hash = match hash::read_hash_image(&buf) {
+        Ok(hash) => hash,
+        Err(e) => {
+            return Err(e);
+        }
+    };
 
     let mut bufreader = Cursor::new(buf);
     let exifreader = exif::Reader::new();
@@ -64,7 +71,7 @@ pub(crate) fn get_file_info(buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf
         .join(model.to_string())
         .join(path.file_name().unwrap().to_str().unwrap());
 
-    return Some(Photo {
+    return Ok(Photo {
         hash: hash,
         model: model,
         year: date_tuple.0,

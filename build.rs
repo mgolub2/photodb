@@ -264,7 +264,8 @@ fn bindings(out_dir: &Path) {
     for func in DENY_FUNCS.iter() {
         builder = builder.blocklist_function(func);
     }
-    builder.generate()
+    builder
+        .generate()
         .expect("Unable to generate bindings")
         .write_to_file(out_dir.join("bindings.rs"))
         .expect("Couldn't write bindings!");

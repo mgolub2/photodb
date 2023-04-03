@@ -22,7 +22,7 @@ fn import_directory(
     move_file: bool,
     insert: bool,
     database: &PathBuf,
-) -> Result<u64, Box<dyn Error>> {
+) -> Result<(u64, u64, u64, u64), Box<dyn Error>> {
     if !path_to_import.is_dir() {
         println!("{} is not a directory", path_to_import.display());
         return Err("Not a directory".into());
@@ -41,60 +41,68 @@ fn import_directory(
     .filter_map(|path| is_image_file(&path).then_some(path))
     .collect();
 
-    println!("Importing {} files", img_files.len());
-    let imported_count = img_files
+    let total_files = img_files.len();
+    println!("Importing {} files", total_files);
+    let imported_count: (u64, u64, u64) = img_files
         .par_iter()
         .map(|path| {
             let buf = match fs::read(&path) {
                 Ok(buf) => buf,
                 Err(e) => {
-                    println!("Error reading file {}: {}", path.display(), e);
-                    return 0;
+                    println!("Error: reading file {} -> {}", path.display(), e);
+                    return (0, 0, 1);
                 }
             };
-            let photo = get_file_info(&buf, &path, import_path);
-            if let Some(metadata) = photo {
-                let mut conn = Connection::open(database).unwrap();
-                let mut do_insert = insert;
-                if !db::is_imported(metadata.hash, &mut conn) {
-                    let moved = match move_file {
-                        true => match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
-                            Ok(_) => true,
-                            Err(e) => {
-                                println!("Error moving image: {}", e);
-                                do_insert = false;
-                                false
-                            }
-                        },
-                        false => true,
-                    };
-                    let inserted = match do_insert {
-                        true => match db::insert_file_to_db(&metadata, &mut conn) {
-                            Ok(_) => true,
-                            Err(e) => {
-                                println!("Error inserting image: {}", e);
-                                false
-                            }
-                        },
-                        false => true,
-                    };
-                    println!("{} -> {}", path.display(), metadata.db_path.display());
-                    return (inserted && moved) as u64;
-                } else {
-                    println!(
-                        "Image already imported: {} -> {:#x}",
-                        path.display(),
-                        metadata.hash
-                    );
-                    return 0;
+            match get_file_info(&buf, &path, import_path) {
+                Ok(metadata) => {
+                    let mut conn = Connection::open(database).unwrap();
+                    let mut do_insert = insert;
+                    if !db::is_imported(metadata.hash, &mut conn) {
+                        let moved = match move_file {
+                            true => match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
+                                Ok(_) => true,
+                                Err(e) => {
+                                    println!("Error: moving image {} -> {}", path.display(), e);
+                                    do_insert = false;
+                                    false
+                                }
+                            },
+                            false => true,
+                        };
+                        let inserted = match do_insert {
+                            true => match db::insert_file_to_db(&metadata, &mut conn) {
+                                Ok(_) => true,
+                                Err(e) => {
+                                    println!("Error: inserting image {} -> {}", path.display(), e);
+                                    false
+                                }
+                            },
+                            false => true,
+                        };
+                        println!("{} -> {}", path.display(), metadata.db_path.display());
+                        return ((inserted && moved) as u64, 0, !(inserted && moved) as u64);
+                    } else {
+                        println!(
+                            "Image already imported: {} -> {:#x}",
+                            path.display(),
+                            metadata.hash
+                        );
+                        return (0, 1, 0);
+                    }
                 }
-            } else {
-                println!("Unable to hash file: {}", path.display());
-                return 0;
+                Err(e) => {
+                    println!("Error: unable to hash file: {} -> {}", path.display(), e);
+                    return (0, 0, 1);
+                }
             }
         })
-        .count();
-    Ok(imported_count as u64)
+        .reduce(|| (0, 0, 0), |(a, b, c), (d, e, f)| (a + d, b + e, c + f));
+    Ok((
+        total_files as u64,
+        imported_count.0,
+        imported_count.1,
+        imported_count.2,
+    ))
 }
 
 fn verify_db(database: &PathBuf) {
@@ -118,25 +126,35 @@ fn verify_db(database: &PathBuf) {
         .for_each(|photo| match photo.db_path.exists() {
             true => {
                 let hash = match fs::read(&photo.db_path) {
-                    Ok(buf) => hash::read_hash_image(&buf),
+                    Ok(buf) => match hash::read_hash_image(&buf) {
+                        Ok(hash) => hash,
+                        Err(e) => {
+                            println!(
+                                "Error: calculating hash {} -> {}",
+                                &photo.og_path.display(),
+                                e
+                            );
+                            0
+                        }
+                    },
                     Err(e) => {
-                        println!("Error reading file: {}", e);
+                        println!("Error: reading file {} -> {}", &photo.og_path.display(), e);
                         0
                     }
                 };
                 if hash != photo.hash {
                     println!(
-                        "Hash mismatch on {} : {:#x} file != {:#x} db",
+                        "Error: hash mismatch on {} -> {:#x} file != {:#x} db",
                         &photo.db_path.display(),
                         hash,
                         photo.hash
                     );
                 } else {
-                    println!("verified: {} -> {:#x}", photo.db_path.display(), hash);
+                    println!("Verified: {} -> {:#x}", photo.db_path.display(), hash);
                 }
             }
             false => {
-                println!("File not found: {}", photo.db_path.display());
+                println!("Error: file not found {} -> ???", photo.db_path.display());
             }
         });
     println!("Done verifying {} photos", photos.len());
@@ -162,7 +180,10 @@ fn main() {
                 args.insert,
                 &args.database,
             ) {
-                Ok(v) => println!("Imported {} files", v),
+                Ok(v) => println!(
+                    "Imported {}/{} files. {} already imported. {} errors.",
+                    v.1, v.0, v.2, v.3
+                ),
                 Err(e) => println!("Error importing files: {}", e),
             }
         }

@@ -5,13 +5,14 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use core::slice;
+use std::error::Error;
 
 pub struct RawImage {
     pub raw_data: Vec<u16>,
 }
 
 impl RawImage {
-    pub fn new(buf: &[u8]) -> Option<Self> {
+    pub fn new(buf: &[u8]) -> Result<Self, Box<dyn Error>> {
         let libraw_data = unsafe { libraw_init(0) };
         match unsafe { libraw_open_buffer(libraw_data, buf.as_ptr() as *const _, buf.len()) } {
             LibRaw_errors_LIBRAW_SUCCESS => match unsafe { libraw_unpack(libraw_data) } {
@@ -26,11 +27,11 @@ impl RawImage {
                     let mut raw_data = Vec::with_capacity(raw_image_size);
                     raw_data.extend_from_slice(raw_image_slice);
                     unsafe { libraw_close(libraw_data) };
-                    return Some(Self { raw_data });
+                    return Ok(Self { raw_data });
                 }
-                _ => None,
+                _ => Err("libraw_unpack failed".into()),
             },
-            _ => None,
+            _ => Err("libraw_open_buffer failed".into()),
         }
     }
 }
