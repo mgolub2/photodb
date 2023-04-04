@@ -56,28 +56,28 @@ fn import_directory(
             match get_file_info(&buf, &path, import_path) {
                 Ok(metadata) => {
                     let mut conn = Connection::open(database).unwrap();
-                    let mut do_insert = insert;
+                    let mut do_move = move_file;
                     if !db::is_imported(metadata.hash, &mut conn) {
-                        let moved = match move_file {
-                            true => match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
-                                Ok(_) => true,
-                                Err(e) => {
-                                    println!("Error: moving image {} -> {}", path.display(), e);
-                                    do_insert = false;
-                                    false
-                                }
-                            },
-                            false => true,
-                        };
-                        let inserted = match do_insert {
+                        let inserted = match insert {
                             true => match db::insert_file_to_db(&metadata, &mut conn) {
                                 Ok(_) => true,
                                 Err(e) => {
                                     println!("Error: inserting image {} -> {}", path.display(), e);
+                                    do_move = false;
                                     false
                                 }
                             },
-                            false => true,
+                            false => false,
+                        };
+                        let moved = match do_move {
+                            true => match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
+                                Ok(_) => true,
+                                Err(e) => {
+                                    println!("Error: moving image {} -> {}", path.display(), e);
+                                    false
+                                }
+                            },
+                            false => false,
                         };
                         println!("{} -> {}", path.display(), metadata.db_path.display());
                         return ((inserted && moved) as u64, 0, !(inserted && moved) as u64);

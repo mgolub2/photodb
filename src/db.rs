@@ -4,7 +4,7 @@ use crate::photo::Photo;
 
 pub(crate) fn create_table(con: &mut Connection) {
     let query = "
-    CREATE TABLE photodb (hash BLOB UNIQUE, original_path TEXT, imported_path TEXT, year INTEGER, month INTEGER, model TEXT);
+    CREATE TABLE photodb (hash BLOB UNIQUE, original_path TEXT, imported_path TEXT UNIQUE, year INTEGER, month INTEGER, model TEXT);
 ";
 
     match con.execute(query, ()) {
