@@ -22,11 +22,7 @@ pub(crate) fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
             ) {
                 Ok(date) => Some(date),
                 Err(e) => {
-                    println!(
-                        "Warning: error parsing date {} -> {}",
-                        date.display_value(),
-                        e
-                    );
+                    println!("Warning: error parsing date {} -> {}", date.display_value(), e);
                     None
                 }
             };
@@ -36,9 +32,7 @@ pub(crate) fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
 }
 
 pub(crate) fn get_file_info(
-    buf: &Vec<u8>,
-    path: &PathBuf,
-    import_path: &PathBuf,
+    buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf,
 ) -> Result<Photo, Box<dyn Error>> {
     let hash = match hash::read_hash_image(&buf) {
         Ok(hash) => hash,
@@ -52,11 +46,7 @@ pub(crate) fn get_file_info(
     let exif = match exifreader.read_from_container(&mut bufreader) {
         Ok(exif) => Some(exif),
         Err(e) => {
-            println!(
-                "Warning: error reading exif data {} -> {}",
-                path.display(),
-                e
-            );
+            println!("Warning: error reading exif data {} -> {}", path.display(), e);
             None
         }
     };
@@ -125,11 +115,7 @@ pub(crate) fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std
             return file.write_all(buf);
         }
         Err(e) => {
-            println!(
-                "Error creating directory {}: {}",
-                path.parent().unwrap().display(),
-                e
-            );
+            println!("Error creating directory {}: {}", path.parent().unwrap().display(), e);
             return Err(e);
         }
     }

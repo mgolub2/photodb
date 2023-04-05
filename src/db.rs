@@ -14,12 +14,8 @@ pub(crate) fn create_table(con: &mut Connection) {
 }
 
 pub(crate) fn is_imported(hash: i128, con: &mut Connection) -> bool {
-    let mut stmt = con
-        .prepare("SELECT * FROM photodb WHERE hash = :hash")
-        .expect("conn failed");
-    let mut rows = stmt
-        .query(named_params! { ":hash": hash })
-        .expect("rows failed");
+    let mut stmt = con.prepare("SELECT * FROM photodb WHERE hash = :hash").expect("conn failed");
+    let mut rows = stmt.query(named_params! { ":hash": hash }).expect("rows failed");
     let row = rows.next().expect("query failed");
     return match row {
         Some(_) => true,

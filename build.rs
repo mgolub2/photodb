@@ -222,10 +222,7 @@ fn build(out_dir: &Path) {
     libraw.compile("raw");
     libraw.compile("raw_r");
 
-    println!(
-        "cargo:rustc-link-search=native={}",
-        out_dir.join("lib").display()
-    );
+    println!("cargo:rustc-link-search=native={}", out_dir.join("lib").display());
     //println!("cargo:rustc-link-lib=c++");
     println!("cargo:rustc-link-lib=static=raw_r");
 }

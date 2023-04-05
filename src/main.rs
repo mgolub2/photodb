@@ -17,10 +17,7 @@ use std::{error::Error, fs, path::PathBuf};
 use crate::image::{get_file_info, is_image_file, write_to_path};
 
 fn import_directory(
-    path_to_import: &PathBuf,
-    import_path: &PathBuf,
-    move_file: bool,
-    insert: bool,
+    path_to_import: &PathBuf, import_path: &PathBuf, move_file: bool, insert: bool,
     database: &PathBuf,
 ) -> Result<(u64, u64, u64, u64), Box<dyn Error>> {
     if !path_to_import.is_dir() {
@@ -29,17 +26,11 @@ fn import_directory(
     }
     let options: MatchOptions = Default::default();
 
-    let img_files: Vec<_> = glob_with(
-        path_to_import
-            .join("**/*")
-            .as_os_str()
-            .to_str()
-            .expect("join"),
-        options,
-    )?
-    .filter_map(|x| x.ok())
-    .filter_map(|path| is_image_file(&path).then_some(path))
-    .collect();
+    let img_files: Vec<_> =
+        glob_with(path_to_import.join("**/*").as_os_str().to_str().expect("join"), options)?
+            .filter_map(|x| x.ok())
+            .filter_map(|path| is_image_file(&path).then_some(path))
+            .collect();
 
     let total_files = img_files.len();
     println!("Importing {} files", total_files);
@@ -97,12 +88,7 @@ fn import_directory(
             }
         })
         .reduce(|| (0, 0, 0), |(a, b, c), (d, e, f)| (a + d, b + e, c + f));
-    Ok((
-        total_files as u64,
-        imported_count.0,
-        imported_count.1,
-        imported_count.2,
-    ))
+    Ok((total_files as u64, imported_count.0, imported_count.1, imported_count.2))
 }
 
 fn verify_db(database: &PathBuf) {
@@ -121,42 +107,36 @@ fn verify_db(database: &PathBuf) {
         })
         .unwrap();
     let photos = rows.collect::<Result<Vec<_>, _>>().unwrap();
-    photos
-        .par_iter()
-        .for_each(|photo| match photo.db_path.exists() {
-            true => {
-                let hash = match fs::read(&photo.db_path) {
-                    Ok(buf) => match hash::read_hash_image(&buf) {
-                        Ok(hash) => hash,
-                        Err(e) => {
-                            println!(
-                                "Error: calculating hash {} -> {}",
-                                &photo.og_path.display(),
-                                e
-                            );
-                            0
-                        }
-                    },
+    photos.par_iter().for_each(|photo| match photo.db_path.exists() {
+        true => {
+            let hash = match fs::read(&photo.db_path) {
+                Ok(buf) => match hash::read_hash_image(&buf) {
+                    Ok(hash) => hash,
                     Err(e) => {
-                        println!("Error: reading file {} -> {}", &photo.og_path.display(), e);
+                        println!("Error: calculating hash {} -> {}", &photo.og_path.display(), e);
                         0
                     }
-                };
-                if hash != photo.hash {
-                    println!(
-                        "Error: hash mismatch on {} -> {:#x} file != {:#x} db",
-                        &photo.db_path.display(),
-                        hash,
-                        photo.hash
-                    );
-                } else {
-                    println!("Verified: {} -> {:#x}", photo.db_path.display(), hash);
+                },
+                Err(e) => {
+                    println!("Error: reading file {} -> {}", &photo.og_path.display(), e);
+                    0
                 }
+            };
+            if hash != photo.hash {
+                println!(
+                    "Error: hash mismatch on {} -> {:#x} file != {:#x} db",
+                    &photo.db_path.display(),
+                    hash,
+                    photo.hash
+                );
+            } else {
+                println!("Verified: {} -> {:#x}", photo.db_path.display(), hash);
             }
-            false => {
-                println!("Error: file not found {} -> ???", photo.db_path.display());
-            }
-        });
+        }
+        false => {
+            println!("Error: file not found {} -> ???", photo.db_path.display());
+        }
+    });
     println!("Done verifying {} photos", photos.len());
 }
 

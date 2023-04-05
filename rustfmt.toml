@@ -1,0 +1,5 @@
+    
+    max_width = 100
+    fn_args_layout = "Compressed"
+    reorder_imports = true
+    use_small_heuristics = "Max"
