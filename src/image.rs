@@ -6,23 +6,33 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use chrono::{Datelike, NaiveDate, ParseError};
+use chrono::{Datelike, NaiveDate};
 use exif::{In, Tag};
 
 use crate::{hash, photo::Photo};
 
-pub(crate) fn get_date(exif: &exif::Exif) -> Result<NaiveDate, ParseError> {
+pub(crate) fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
     let exif_date_keys = [Tag::DateTimeOriginal, Tag::DateTime];
     //let format_strs = ["%Y-%m-%d %H:%M:%S", ];
     for key in exif_date_keys.iter() {
         if let Some(date) = exif.get_field(*key, In::PRIMARY) {
-            return NaiveDate::parse_from_str(
+            return match NaiveDate::parse_from_str(
                 &date.display_value().to_string(),
                 "%Y-%m-%d %H:%M:%S",
-            );
+            ) {
+                Ok(date) => Some(date),
+                Err(e) => {
+                    println!(
+                        "Warning: error parsing date {} -> {}",
+                        date.display_value(),
+                        e
+                    );
+                    None
+                }
+            };
         }
     }
-    return NaiveDate::parse_from_str("fail", "%Y-%m-%d %H:%M:%S");
+    None
 }
 
 pub(crate) fn get_file_info(
@@ -39,31 +49,39 @@ pub(crate) fn get_file_info(
 
     let mut bufreader = Cursor::new(buf);
     let exifreader = exif::Reader::new();
-    let exif = exifreader.read_from_container(&mut bufreader);
-
-    let model: String = match &exif {
-        Ok(ex) => match ex.get_field(Tag::Model, In::PRIMARY) {
-            Some(model) => model
-                .display_value()
-                .to_string()
-                .replace("\"", "")
-                .replace(",", "")
-                .trim()
-                .to_string(),
-            None => "unknown".to_string(),
-        },
-        Err(_) => "unknown".to_string(),
-    };
-    let date_tuple: (i32, u32) = match &exif {
-        Ok(exif) => {
-            let date = get_date(&exif);
-            match date {
-                Ok(date) => (date.year(), date.month()),
-                Err(_) => (0, 0),
-            }
+    let exif = match exifreader.read_from_container(&mut bufreader) {
+        Ok(exif) => Some(exif),
+        Err(e) => {
+            println!(
+                "Warning: error reading exif data {} -> {}",
+                path.display(),
+                e
+            );
+            None
         }
-        Err(_) => (0, 0),
     };
+
+    let model: String = exif
+        .as_ref()
+        .and_then(|ex| ex.get_field(Tag::Model, In::PRIMARY).cloned())
+        .and_then(|model| {
+            Some(
+                model
+                    .display_value()
+                    .to_string()
+                    .replace("\"", "")
+                    .replace(",", "")
+                    .trim()
+                    .to_string(),
+            )
+        })
+        .unwrap_or("unknown".to_string());
+
+    let date_tuple = exif
+        .as_ref()
+        .and_then(|exif| get_date(&exif))
+        .and_then(|d| Some((d.year(), d.month())))
+        .unwrap_or((0, 0));
 
     let import_path_full = import_path
         .join(date_tuple.0.to_string())
