@@ -14,6 +14,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aho-corasick"
+version = "0.7.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc936419f96fa211c1b9166887b38e5e40b19958e5b895be7c1f93adec7071ac"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -21,6 +30,12 @@ checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "anyhow"
+version = "1.0.70"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7de8ce5e0f9f8d88245311066a578d72b7af3e7088f32783804676302df237e4"
 
 [[package]]
 name = "autocfg"
@@ -255,6 +270,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.8",
+]
+
+[[package]]
+name = "dateparser"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18e537db44ee4822af930a9a2c9eedfcde9d47e01c6731fbf34ea01b5a7ccf7d"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "lazy_static",
+ "regex",
 ]
 
 [[package]]
@@ -581,6 +608,7 @@ dependencies = [
  "cc",
  "chrono",
  "clap",
+ "dateparser",
  "glob",
  "kamadak-exif",
  "rayon",
@@ -640,6 +668,8 @@ version = "1.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b1f693b24f6ac912f4893ef08244d70b6067480d2f1a46e950c9691e6749d1d"
 dependencies = [
+ "aho-corasick",
+ "memchr",
  "regex-syntax",
 ]
 

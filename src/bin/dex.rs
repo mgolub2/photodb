@@ -20,7 +20,9 @@ fn print_exif(path: &PathBuf) {
     println!("{}:", path.display());
     for f in exif.fields() {
         let value = f.display_value().with_unit(&exif);
-        if value.to_string().len() > 100 { continue; }
+        if value.to_string().len() > 100 {
+            continue;
+        }
         println!("\t{}:{} :: {}", f.ifd_num, f.tag, value);
     }
 }

@@ -1,3 +1,7 @@
+use crate::{hash, photo::Photo};
+use chrono::{DateTime, Datelike, Utc};
+use dateparser::parse;
+use exif::{In, Tag};
 use std::{
     error::Error,
     ffi::OsStr,
@@ -6,20 +10,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use chrono::{Datelike, NaiveDate};
-use exif::{In, Tag};
-
-use crate::{hash, photo::Photo};
-
-pub fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
+pub fn get_date(exif: &exif::Exif) -> Option<DateTime<Utc>> {
     let exif_date_keys = [Tag::DateTimeOriginal, Tag::DateTime];
-    //let format_strs = ["%Y-%m-%d %H:%M:%S", ];
     for key in exif_date_keys.iter() {
         if let Some(date) = exif.get_field(*key, In::PRIMARY) {
-            return match NaiveDate::parse_from_str(
-                &date.display_value().to_string(),
-                "%Y-%m-%d %H:%M:%S",
-            ) {
+            return match parse(&date.display_value().to_string()) {
                 Ok(date) => Some(date),
                 Err(e) => {
                     println!("Warning: error parsing date {} -> {}", date.display_value(), e);
