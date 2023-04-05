@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-pub(crate) struct Photo {
-    pub(crate) hash: i128,
-    pub(crate) model: String,
-    pub(crate) year: i32,
-    pub(crate) month: u32,
-    pub(crate) db_path: PathBuf,
-    pub(crate) og_path: PathBuf,
+pub struct Photo {
+    pub hash: i128,
+    pub model: String,
+    pub year: i32,
+    pub month: u32,
+    pub db_path: PathBuf,
+    pub og_path: PathBuf,
 }

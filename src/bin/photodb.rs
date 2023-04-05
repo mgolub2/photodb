@@ -1,13 +1,12 @@
-mod cli;
-mod db;
-mod hash;
-mod image;
-mod photo;
-#[allow(dead_code)]
-mod raw;
-
+extern crate photodb;
 use clap::Parser;
-use cli::{Cli, Mode};
+use photodb::cli;
+use photodb::cli::Mode;
+use photodb::db;
+use photodb::hash;
+use photodb::image;
+use photodb::photo;
+
 use glob::{glob_with, MatchOptions};
 use photo::Photo;
 use rayon::prelude::*;
@@ -141,7 +140,7 @@ fn verify_db(database: &PathBuf) {
 }
 
 fn main() {
-    let args = Cli::parse();
+    let args = cli::Cli::parse();
 
     if args.create {
         // create the path if it doesn't exist

@@ -4,7 +4,7 @@ use crate::raw;
 use xxhash_rust::xxh3::Xxh3;
 const SEED: u64 = 0xdeadbeef;
 
-pub(crate) fn read_hash_image(buf: &Vec<u8>) -> Result<i128, Box<dyn Error>> {
+pub fn read_hash_image(buf: &Vec<u8>) -> Result<i128, Box<dyn Error>> {
     let image = raw::RawImage::new(buf);
     let mut xxh: Xxh3 = Xxh3::with_seed(SEED);
     match image {

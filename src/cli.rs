@@ -5,29 +5,29 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
-pub(crate) struct Cli {
+pub struct Cli {
     /// Mode to run
     #[clap(subcommand)]
-    pub(crate) mode: Mode,
+    pub mode: Mode,
     /// The database root to move files into
     #[clap(long, default_value = "photodb")]
-    pub(crate) import_path: PathBuf,
+    pub import_path: PathBuf,
     /// Move the files to the database root
     #[clap(short, long, default_value_t = false)]
-    pub(crate) move_files: bool,
+    pub move_files: bool,
     /// Import the files into the database, checking for duplicates
     #[clap(short, long, default_value_t = false)]
-    pub(crate) insert: bool,
+    pub insert: bool,
     /// The name of the database to use
     #[clap(short, long, default_value = ".photodb/photo.db")]
-    pub(crate) database: PathBuf,
+    pub database: PathBuf,
     /// Create the database
     #[clap(short, long, default_value_t = false)]
-    pub(crate) create: bool,
+    pub create: bool,
 }
 
 #[derive(Subcommand)]
-pub(crate) enum Mode {
+pub enum Mode {
     /// Import files into the database
     Import {
         /// The path to the file or directory to read

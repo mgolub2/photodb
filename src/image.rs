@@ -11,7 +11,7 @@ use exif::{In, Tag};
 
 use crate::{hash, photo::Photo};
 
-pub(crate) fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
+pub fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
     let exif_date_keys = [Tag::DateTimeOriginal, Tag::DateTime];
     //let format_strs = ["%Y-%m-%d %H:%M:%S", ];
     for key in exif_date_keys.iter() {
@@ -31,7 +31,7 @@ pub(crate) fn get_date(exif: &exif::Exif) -> Option<NaiveDate> {
     None
 }
 
-pub(crate) fn get_file_info(
+pub fn get_file_info(
     buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf,
 ) -> Result<Photo, Box<dyn Error>> {
     let hash = match hash::read_hash_image(&buf) {
@@ -89,7 +89,7 @@ pub(crate) fn get_file_info(
     });
 }
 
-pub(crate) fn is_image_file(path: &Path) -> bool {
+pub fn is_image_file(path: &Path) -> bool {
     if path.is_file() {
         return match path
             .extension()
@@ -107,7 +107,7 @@ pub(crate) fn is_image_file(path: &Path) -> bool {
     }
 }
 
-pub(crate) fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std::io::Error> {
+pub fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std::io::Error> {
     //write buf to path
     match fs::create_dir_all(path.parent().unwrap()) {
         Ok(_) => {

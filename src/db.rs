@@ -2,7 +2,7 @@ use rusqlite::{named_params, Connection, Result};
 
 use crate::photo::Photo;
 
-pub(crate) fn create_table(con: &mut Connection) {
+pub fn create_table(con: &mut Connection) {
     let query = "
     CREATE TABLE photodb (hash BLOB UNIQUE, original_path TEXT, imported_path TEXT UNIQUE, year INTEGER, month INTEGER, model TEXT);
 ";
@@ -13,7 +13,7 @@ pub(crate) fn create_table(con: &mut Connection) {
     }
 }
 
-pub(crate) fn is_imported(hash: i128, con: &mut Connection) -> bool {
+pub fn is_imported(hash: i128, con: &mut Connection) -> bool {
     let mut stmt = con.prepare("SELECT * FROM photodb WHERE hash = :hash").expect("conn failed");
     let mut rows = stmt.query(named_params! { ":hash": hash }).expect("rows failed");
     let row = rows.next().expect("query failed");
@@ -23,7 +23,7 @@ pub(crate) fn is_imported(hash: i128, con: &mut Connection) -> bool {
     };
 }
 
-pub(crate) fn insert_file_to_db(metadata: &Photo, conn: &mut Connection) -> Result<()> {
+pub fn insert_file_to_db(metadata: &Photo, conn: &mut Connection) -> Result<()> {
     let mut stmt = conn.prepare(
             "INSERT INTO photodb (hash, original_path, imported_path, year, month, model) VALUES (:hash, :og_path, :imprt_path, :year, :month, :model)").unwrap();
     stmt.execute(named_params! {
