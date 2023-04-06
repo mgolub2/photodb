@@ -9,9 +9,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const EXIF_DATE_KEYS: [&str; 3] =
+    ["Exif.Photo.DateTimeOriginal", "Exif.Photo.DateTimeDigitized", "Exif.Image.DateTime"];
+
 pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
-    let exif_date_keys = ["Exif.Photo.DateTimeOriginal", "Exif.Photo.DateTimeDigitized"];
-    for key in exif_date_keys.iter() {
+    for key in EXIF_DATE_KEYS.iter() {
         exif.get_tag_string(*key).ok().and_then(|date| {
             return match parse(&date) {
                 Ok(date) => Some(date),
