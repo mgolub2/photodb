@@ -16,6 +16,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Install libgexiv2-dev
+        run: sudo apt update && sudo apt install libgexiv2-dev
       - name: Build Release
         run: cargo build --release
       - name: Upload a Build Artifact
