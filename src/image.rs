@@ -49,7 +49,7 @@ pub fn get_file_info(
 
     let model: String = exif
         .as_ref()
-        .and_then(|ex| ex.get_tag_string("Model").ok())
+        .and_then(|ex| ex.get_tag_string("Exif.Image.Model").ok())
         .and_then(|model| Some(model.replace("\"", "").replace(",", "").trim().to_string()))
         .unwrap_or("unknown".to_string());
 
