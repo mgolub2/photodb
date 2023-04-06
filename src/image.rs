@@ -1,6 +1,6 @@
 use crate::{hash, photo::Photo};
 use chrono::{DateTime, Datelike, Utc};
-use dateparser::parse;
+use diligent_date_parser::parse_date;
 use std::{
     error::Error,
     ffi::OsStr,
@@ -15,13 +15,7 @@ const EXIF_DATE_KEYS: [&str; 3] =
 pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
     for key in EXIF_DATE_KEYS.iter() {
         exif.get_tag_string(*key).ok().and_then(|date| {
-            return match parse(&date) {
-                Ok(date) => Some(date),
-                Err(e) => {
-                    println!("Warning: error parsing date {} -> {}", date, e);
-                    None
-                }
-            };
+            parse_date(&date)
         });
     }
     None
