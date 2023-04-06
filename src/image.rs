@@ -85,21 +85,14 @@ pub fn get_file_info(
 }
 
 pub fn is_image_file(path: &Path) -> bool {
-    if path.is_file() {
-        return match path
-            .extension()
-            .and_then(OsStr::to_str)
-            .unwrap_or_default()
-            .to_lowercase()
-            .as_str()
-        {
+    Some(path.is_file() && !path.starts_with("."))
+        .and_then(|_| path.extension().and_then(OsStr::to_str))
+        .and_then(|f| match f.to_lowercase().as_str() {
             "3fr" | "arw" | "cr2" | "fff" | "mef" | "mos" | "iiq" | "nef" | "raf" | "rw2"
-            | "dng" => true,
-            _ => false,
-        };
-    } else {
-        return false;
-    }
+            | "dng" => Some(true),
+            _ => Some(false),
+        })
+        .unwrap_or(false)
 }
 
 pub fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std::io::Error> {

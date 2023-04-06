@@ -1,5 +1,5 @@
 use clap::Parser;
-use glob::{glob_with, MatchOptions};
+use glob::glob;
 use photodb::image::is_image_file;
 use std::path::PathBuf;
 
@@ -37,18 +37,19 @@ fn main() {
 }
 
 fn scan_dir(image_directory: &PathBuf) {
-    let options: MatchOptions = Default::default();
-    let img_files: Option<PathBuf> =
-        glob_with(&image_directory.join("**/*").as_os_str().to_str().expect("join"), options)
+    let img_files: Vec<PathBuf> =
+        glob(&image_directory.join("**/*").as_os_str().to_str().expect("join"))
             .ok()
             .and_then(|paths| {
                 Some(
                     paths
-                        .filter_map(|x| x.ok())
-                        .filter_map(|path| is_image_file(&path).then_some(path))
+                        .filter_map(|p| {
+                            p.ok().and_then(|p| if is_image_file(&p) { Some(p) } else { None })
+                        })
                         .collect(),
                 )
-            });
+            })
+            .unwrap_or_default();
     for f in img_files.iter() {
         print_exif(f);
     }
