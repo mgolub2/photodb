@@ -14,6 +14,7 @@ kamadak-exif = "0.5.5"
 rayon = "1.7.0"
 rusqlite = { version = "0.29.0", features = ["bundled", "i128_blob"] }
 xxhash-rust = {version = "0.8.6", features= ["xxh3", "const_xxh3"]}
+time = "0.2.23"
 
 [profile.release-with-debug]
 inherits = "release"
