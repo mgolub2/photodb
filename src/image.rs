@@ -1,27 +1,26 @@
 use crate::{hash, photo::Photo};
 use chrono::{DateTime, Datelike, Utc};
 use dateparser::parse;
-use exif::{In, Tag};
 use std::{
     error::Error,
     ffi::OsStr,
     fs,
-    io::{Cursor, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 
-pub fn get_date(exif: &exif::Exif) -> Option<DateTime<Utc>> {
-    let exif_date_keys = [Tag::DateTimeOriginal, Tag::DateTime];
+pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
+    let exif_date_keys = ["Exif.Photo.DateTimeOriginal", "Exif.Photo.DateTimeDigitized"];
     for key in exif_date_keys.iter() {
-        if let Some(date) = exif.get_field(*key, In::PRIMARY) {
-            return match parse(&date.display_value().to_string()) {
+        exif.get_tag_string(*key).ok().and_then(|date| {
+            return match parse(&date) {
                 Ok(date) => Some(date),
                 Err(e) => {
-                    println!("Warning: error parsing date {} -> {}", date.display_value(), e);
+                    println!("Warning: error parsing date {} -> {}", date, e);
                     None
                 }
             };
-        }
+        });
     }
     None
 }
@@ -36,9 +35,9 @@ pub fn get_file_info(
         }
     };
 
-    let mut bufreader = Cursor::new(buf);
-    let exifreader = exif::Reader::new();
-    let exif = match exifreader.read_from_container(&mut bufreader) {
+    //let mut bufreader = Cursor::new(buf);
+    //let exifreader = exif::Reader::new();
+    let exif = match rexiv2::Metadata::new_from_buffer(buf) {
         Ok(exif) => Some(exif),
         Err(e) => {
             println!("Warning: error reading exif data {} -> {}", path.display(), e);
@@ -48,18 +47,8 @@ pub fn get_file_info(
 
     let model: String = exif
         .as_ref()
-        .and_then(|ex| ex.get_field(Tag::Model, In::PRIMARY).cloned())
-        .and_then(|model| {
-            Some(
-                model
-                    .display_value()
-                    .to_string()
-                    .replace("\"", "")
-                    .replace(",", "")
-                    .trim()
-                    .to_string(),
-            )
-        })
+        .and_then(|ex| ex.get_tag_string("Model").ok())
+        .and_then(|model| Some(model.replace("\"", "").replace(",", "").trim().to_string()))
         .unwrap_or("unknown".to_string());
 
     let date_tuple = exif

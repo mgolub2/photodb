@@ -9,6 +9,9 @@ use std::error::Error;
 
 pub struct RawImage {
     pub raw_data: Vec<u16>,
+    pub year: i32,
+    pub month: u32,
+    pub make: String,
 }
 
 impl RawImage {
@@ -26,8 +29,15 @@ impl RawImage {
                         unsafe { slice::from_raw_parts(raw_image as *mut u16, raw_image_size) };
                     let mut raw_data = Vec::with_capacity(raw_image_size);
                     raw_data.extend_from_slice(raw_image_slice);
+                    let make = unsafe {
+                        let make = (*libraw_data).idata.make.as_ptr() as *const u8;
+                        let make_len = (*libraw_data).idata.make.len();
+                        let make_slice = slice::from_raw_parts(make, make_len);
+                        String::from_utf8_lossy(make_slice).to_string()
+                    };
+                    //let datetime = parse(unsafe { (*libraw_data).idata.datetime.as_ptr() as *const _ });
                     unsafe { libraw_close(libraw_data) };
-                    return Ok(Self { raw_data });
+                    return Ok(Self { raw_data, year: 0, month: 0, make });
                 }
                 _ => Err("libraw_unpack failed".into()),
             },

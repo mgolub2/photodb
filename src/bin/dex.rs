@@ -1,6 +1,7 @@
 use clap::Parser;
 use glob::glob;
 use photodb::image::is_image_file;
+use rexiv2::Metadata;
 use std::path::PathBuf;
 
 /// Simple photo database management tool. Pixel content based depduplication via xxhash and libraw.
@@ -13,18 +14,18 @@ pub struct ExCLI {
 }
 
 fn print_exif(path: &PathBuf) {
-    let file = std::fs::File::open(path).expect("read file");
-    let mut bufreader = std::io::BufReader::new(&file);
-    let exifreader = exif::Reader::new();
-    let exif = exifreader.read_from_container(&mut bufreader).expect("read exif");
+    let exif = Metadata::new_from_path(path).expect("read exif");
     println!("{}:", path.display());
-    for f in exif.fields() {
-        let value = f.display_value().with_unit(&exif);
-        if value.to_string().len() > 100 {
-            continue;
-        }
-        println!("\t{}:{} :: {}", f.ifd_num, f.tag, value);
-    }
+    exif.get_exif_tags().ok().and_then(|tags| {
+        Some(tags.iter().for_each(|f| {
+            let val = exif.get_tag_string(f).expect("get tag");
+            if val.len() > 100 {
+                println!("\t{} :: <long value skipped>", f);
+            } else {
+                println!("\t{} :: {}", f, val);
+            }
+        }))
+    });
 }
 
 fn main() {
