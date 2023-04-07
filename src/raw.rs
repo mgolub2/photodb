@@ -35,7 +35,6 @@ impl RawImage {
                         let make_slice = slice::from_raw_parts(make, make_len);
                         String::from_utf8_lossy(make_slice).to_string()
                     };
-                    //let datetime = parse(unsafe { (*libraw_data).idata.datetime.as_ptr() as *const _ });
                     unsafe { libraw_close(libraw_data) };
                     return Ok(Self { raw_data, year: 0, month: 0, make });
                 }
