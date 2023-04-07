@@ -1,6 +1,7 @@
 use clap::Parser;
 use glob::glob;
 use photodb::image::is_image_file;
+use rayon::prelude::*;
 use rexiv2::Metadata;
 use std::path::PathBuf;
 
@@ -71,7 +72,7 @@ fn scan_dir(image_directory: &PathBuf, func: fn(&PathBuf)) {
                 )
             })
             .unwrap_or_default();
-    for f in img_files.iter() {
+    img_files.par_iter().for_each(|f| {
         func(f);
-    }
+    });
 }
