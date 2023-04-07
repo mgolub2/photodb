@@ -40,7 +40,7 @@ fn print_dates(path: &PathBuf) {
                 .filter_map(|t| {
                     (t.contains("Date")).then(|| {
                         let val = exif.get_tag_string(t).expect("get tag");
-                        println!("{}", val);
+                        println!("{} IS {}", t, val);
                     })
                 })
                 .collect(),
