@@ -1,6 +1,5 @@
 use crate::{hash, photo::Photo};
-use chrono::{DateTime, Datelike, FixedOffset};
-use diligent_date_parser::parse_date;
+use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
 use std::{
     error::Error,
     ffi::OsStr,
@@ -12,10 +11,17 @@ use std::{
 const EXIF_DATE_KEYS: [&str; 3] =
     ["Exif.Photo.DateTimeOriginal", "Exif.Photo.DateTimeDigitized", "Exif.Image.DateTime"];
 
-pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<FixedOffset>> {
+const EXIF_DATE_F_STR: [&str; 4] =
+    ["%Y-%m-%d %H:%M:%S", "%Y:%m:%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y:%m:%dT%H:%M:%S"];
+
+pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
+    let parse_from_str = NaiveDateTime::parse_from_str;
     for key in EXIF_DATE_KEYS.iter() {
         match exif.get_tag_string(*key).ok().and_then(|date| {
-            parse_date(&date)
+            EXIF_DATE_F_STR
+                .iter()
+                .find_map(|f| parse_from_str(date.as_str(), *f).ok())
+                .and_then(|date| Some(DateTime::from_utc(date, Utc)))
         }) {
             Some(date) => return Some(date),
             None => continue,

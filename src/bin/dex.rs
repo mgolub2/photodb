@@ -11,6 +11,9 @@ use std::path::PathBuf;
 pub struct ExCLI {
     /// The database root to move files into
     pub img_or_img_dir: PathBuf,
+    /// enable date exif tags only mode
+    #[clap(short, long, default_value_t = false)]
+    pub date_only: bool,
 }
 
 fn print_exif(path: &PathBuf) {
@@ -28,16 +31,33 @@ fn print_exif(path: &PathBuf) {
     });
 }
 
+fn print_dates(path: &PathBuf) {
+    let exif = Metadata::new_from_path(path).expect("read exif");
+    exif.get_exif_tags().ok().and_then(|tags| -> Option<Vec<()>> {
+        Some(
+            tags.iter()
+                .filter_map(|t| {
+                    (t.contains("Date")).then(|| {
+                        let val = exif.get_tag_string(t).expect("get tag");
+                        println!("{}", val);
+                    })
+                })
+                .collect(),
+        )
+    });
+}
+
 fn main() {
     let args = ExCLI::parse();
+    let func = if args.date_only { print_dates } else { print_exif };
     match args.img_or_img_dir {
-        path if path.is_dir() => scan_dir(&path),
+        path if path.is_dir() => scan_dir(&path, func),
         path if path.is_file() => print_exif(&path),
         _ => println!("Not a file or directory"),
     }
 }
 
-fn scan_dir(image_directory: &PathBuf) {
+fn scan_dir(image_directory: &PathBuf, func: fn(&PathBuf)) {
     let img_files: Vec<PathBuf> =
         glob(&image_directory.join("**/*").as_os_str().to_str().expect("join"))
             .ok()
@@ -52,6 +72,6 @@ fn scan_dir(image_directory: &PathBuf) {
             })
             .unwrap_or_default();
     for f in img_files.iter() {
-        print_exif(f);
+        func(f);
     }
 }
