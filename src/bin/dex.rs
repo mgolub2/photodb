@@ -53,7 +53,7 @@ fn main() {
     let func = if args.date_only { print_dates } else { print_exif };
     match args.img_or_img_dir {
         path if path.is_dir() => scan_dir(&path, func),
-        path if path.is_file() => print_exif(&path),
+        path if path.is_file() => func(&path),
         _ => println!("Not a file or directory"),
     }
 }
