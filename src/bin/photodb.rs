@@ -4,7 +4,6 @@ use photodb::cli;
 use photodb::cli::Mode;
 use photodb::db;
 use photodb::hash;
-use photodb::image;
 use photodb::photo;
 
 use glob::{glob_with, MatchOptions};
@@ -13,7 +12,7 @@ use rayon::prelude::*;
 use rusqlite::*;
 use std::{error::Error, fs, path::PathBuf};
 
-use crate::image::{get_file_info, is_image_file, write_to_path};
+use crate::photo::{get_file_info, is_image_file, write_to_path};
 
 fn import_directory(
     path_to_import: &PathBuf, import_path: &PathBuf, move_file: bool, insert: bool,
