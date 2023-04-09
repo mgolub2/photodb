@@ -3,11 +3,11 @@ use clap::Parser;
 use photodb::cli;
 use photodb::cli::Mode;
 use photodb::db;
-use photodb::hash;
 use photodb::photo;
 
 use glob::{glob_with, MatchOptions};
 use photo::Photo;
+use photodb::raw::RawImage;
 use rayon::prelude::*;
 use rusqlite::*;
 use std::{error::Error, fs, path::PathBuf};
@@ -56,7 +56,7 @@ fn import_directory(
                                     false
                                 }
                             },
-                            false => false,
+                            false => true,
                         };
                         let moved = match do_move {
                             true => match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
@@ -66,7 +66,7 @@ fn import_directory(
                                     false
                                 }
                             },
-                            false => false,
+                            false => inserted,
                         };
                         println!("{} -> {}", path.display(), metadata.db_path.display());
                         return ((inserted && moved) as u64, 0, !(inserted && moved) as u64);
@@ -108,8 +108,8 @@ fn verify_db(database: &PathBuf) {
     photos.par_iter().for_each(|photo| match photo.db_path.exists() {
         true => {
             let hash = match fs::read(&photo.db_path) {
-                Ok(buf) => match hash::read_hash_image(&buf) {
-                    Ok(hash) => hash,
+                Ok(buf) => match RawImage::new(&buf) {
+                    Ok(raw_image) => raw_image.hash,
                     Err(e) => {
                         println!("Error: calculating hash {} -> {}", &photo.og_path.display(), e);
                         0

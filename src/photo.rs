@@ -1,4 +1,4 @@
-use crate::hash;
+use crate::raw::RawImage;
 use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
 use std::{
     error::Error,
@@ -54,15 +54,12 @@ pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
 pub fn get_file_info(
     buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf,
 ) -> Result<Photo, Box<dyn Error>> {
-    let hash = match hash::read_hash_image(&buf) {
-        Ok(hash) => hash,
+    let raw_image_data = match RawImage::new(&buf) {
+        Ok(raw_image_data) => raw_image_data,
         Err(e) => {
             return Err(e);
         }
     };
-
-    //let mut bufreader = Cursor::new(buf);
-    //let exifreader = exif::Reader::new();
     let exif = match rexiv2::Metadata::new_from_buffer(buf) {
         Ok(exif) => Some(exif),
         Err(e) => {
@@ -74,8 +71,11 @@ pub fn get_file_info(
     let model: String = exif
         .as_ref()
         .and_then(|ex| ex.get_tag_string("Exif.Image.Model").ok())
-        .and_then(|model| Some(model.replace("\"", "").replace(",", "").trim().to_string()))
-        .unwrap_or("unknown".to_string());
+        .unwrap_or(raw_image_data.make)
+        .replace("\"", "")
+        .replace(",", "")
+        .trim()
+        .to_string();
 
     let date_tuple = exif
         .as_ref()
@@ -90,7 +90,7 @@ pub fn get_file_info(
         .join(path.file_name().unwrap().to_str().unwrap());
 
     return Ok(Photo {
-        hash: hash,
+        hash: raw_image_data.hash,
         model: model,
         year: date_tuple.0,
         month: date_tuple.1,

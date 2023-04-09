@@ -6,9 +6,11 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use core::slice;
 use std::error::Error;
+use xxhash_rust::xxh3::Xxh3;
+const SEED: u64 = 0xdeadbeef;
 
 pub struct RawImage {
-    pub raw_data: Vec<u16>,
+    pub hash: i128,
     pub year: i32,
     pub month: u32,
     pub make: String,
@@ -35,8 +37,13 @@ impl RawImage {
                         let make_slice = slice::from_raw_parts(make, make_len);
                         String::from_utf8_lossy(make_slice).to_string()
                     };
+                    let mut xxh: Xxh3 = Xxh3::with_seed(SEED);
+                    for u16 in raw_data.iter() {
+                        xxh.update(&u16.to_le_bytes());
+                    }
+                    let hash = xxh.digest128() as i128;
                     unsafe { libraw_close(libraw_data) };
-                    return Ok(Self { raw_data, year: 0, month: 0, make });
+                    return Ok(Self { hash, year: 0, month: 0, make });
                 }
                 _ => Err("libraw_unpack failed".into()),
             },
