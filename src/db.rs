@@ -1,6 +1,6 @@
 use rusqlite::{named_params, Connection, Result};
 
-use crate::photo::Photo;
+use crate::raw_photo::Photo;
 
 pub fn create_table(con: &mut Connection) {
     let query = "

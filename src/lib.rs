@@ -1,4 +1,4 @@
 pub mod cli;
 pub mod db;
-pub mod photo;
-pub mod raw;
+pub mod raw_photo;
+pub mod util;

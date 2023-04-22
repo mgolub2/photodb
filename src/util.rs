@@ -1,21 +1,10 @@
-use crate::raw::RawImage;
-use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use std::{
-    error::Error,
     ffi::OsStr,
     fs,
     io::Write,
     path::{Path, PathBuf},
 };
-
-pub struct Photo {
-    pub hash: i128,
-    pub model: String,
-    pub year: i32,
-    pub month: u32,
-    pub db_path: PathBuf,
-    pub og_path: PathBuf,
-}
 
 const EXIF_DATE_KEYS: [&str; 3] =
     ["Exif.Photo.DateTimeOriginal", "Exif.Photo.DateTimeDigitized", "Exif.Image.DateTime"];
@@ -49,54 +38,6 @@ pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
         }
     }
     None
-}
-
-pub fn get_file_info(
-    buf: &Vec<u8>, path: &PathBuf, import_path: &PathBuf,
-) -> Result<Photo, Box<dyn Error>> {
-    let raw_image_data = match RawImage::new(&buf) {
-        Ok(raw_image_data) => raw_image_data,
-        Err(e) => {
-            return Err(e);
-        }
-    };
-    let exif = match rexiv2::Metadata::new_from_buffer(buf) {
-        Ok(exif) => Some(exif),
-        Err(e) => {
-            println!("Warning: error reading exif data {} -> {}", path.display(), e);
-            None
-        }
-    };
-
-    let model: String = exif
-        .as_ref()
-        .and_then(|ex| ex.get_tag_string("Exif.Image.Model").ok())
-        .unwrap_or(raw_image_data.make)
-        .replace("\"", "")
-        .replace(",", "")
-        .trim()
-        .to_string();
-
-    let date_tuple = exif
-        .as_ref()
-        .and_then(|exif| get_date(&exif))
-        .and_then(|d| Some((d.year(), d.month())))
-        .unwrap_or((0, 0));
-
-    let import_path_full = import_path
-        .join(date_tuple.0.to_string())
-        .join(date_tuple.1.to_string())
-        .join(model.to_string())
-        .join(path.file_name().unwrap().to_str().unwrap());
-
-    return Ok(Photo {
-        hash: raw_image_data.hash,
-        model: model,
-        year: date_tuple.0,
-        month: date_tuple.1,
-        db_path: import_path_full,
-        og_path: path.to_path_buf(),
-    });
 }
 
 pub fn is_image_file(path: &Path) -> bool {

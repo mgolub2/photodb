@@ -3,16 +3,15 @@ use clap::Parser;
 use photodb::cli;
 use photodb::cli::Mode;
 use photodb::db;
-use photodb::photo;
+use photodb::util;
 
 use glob::{glob_with, MatchOptions};
-use photo::Photo;
-use photodb::raw::RawImage;
+use photodb::raw_photo::Photo;
 use rayon::prelude::*;
 use rusqlite::*;
 use std::{error::Error, fs, path::PathBuf};
 
-use crate::photo::{get_file_info, is_image_file, write_to_path};
+use crate::util::{is_image_file, write_to_path};
 
 fn import_directory(
     path_to_import: &PathBuf, import_path: &PathBuf, move_file: bool, insert: bool,
@@ -42,13 +41,14 @@ fn import_directory(
                     return (0, 0, 1);
                 }
             };
-            match get_file_info(&buf, &path, import_path) {
-                Ok(metadata) => {
+            match Photo::new(&buf, &path, import_path) {
+                Ok(mut raw_photo) => {
+                    raw_photo.populate_exif_info(&buf);
                     let mut conn = Connection::open(database).unwrap();
                     let mut do_move = move_file;
-                    if !db::is_imported(metadata.hash, &mut conn) {
+                    if !db::is_imported(raw_photo.hash, &mut conn) {
                         let inserted = match insert {
-                            true => match db::insert_file_to_db(&metadata, &mut conn) {
+                            true => match db::insert_file_to_db(&raw_photo, &mut conn) {
                                 Ok(_) => true,
                                 Err(e) => {
                                     println!("Error: inserting image {} -> {}", path.display(), e);
@@ -59,7 +59,7 @@ fn import_directory(
                             false => true,
                         };
                         let moved = match do_move {
-                            true => match write_to_path(buf.clone().as_mut(), &metadata.db_path) {
+                            true => match write_to_path(buf.clone().as_mut(), &raw_photo.db_path) {
                                 Ok(_) => true,
                                 Err(e) => {
                                     println!("Error: moving image {} -> {}", path.display(), e);
@@ -68,13 +68,13 @@ fn import_directory(
                             },
                             false => inserted,
                         };
-                        println!("{} -> {}", path.display(), metadata.db_path.display());
+                        println!("{} -> {}", path.display(), raw_photo.db_path.display());
                         return ((inserted && moved) as u64, 0, !(inserted && moved) as u64);
                     } else {
                         println!(
                             "Image already imported: {} -> {:#x}",
                             path.display(),
-                            metadata.hash
+                            raw_photo.hash
                         );
                         return (0, 1, 0);
                     }
@@ -97,6 +97,7 @@ fn verify_db(database: &PathBuf) {
             Ok(Photo {
                 hash: row.get(0)?,
                 og_path: PathBuf::from(row.get::<_, String>(1)?),
+                db_root: PathBuf::new(),
                 db_path: PathBuf::from(row.get::<_, String>(2)?),
                 year: row.get(3)?,
                 month: row.get(4)?,
@@ -108,7 +109,7 @@ fn verify_db(database: &PathBuf) {
     photos.par_iter().for_each(|photo| match photo.db_path.exists() {
         true => {
             let hash = match fs::read(&photo.db_path) {
-                Ok(buf) => match RawImage::new(&buf) {
+                Ok(buf) => match Photo::new(&buf, &photo.og_path, &photo.db_root) {
                     Ok(raw_image) => raw_image.hash,
                     Err(e) => {
                         println!("Error: calculating hash {} -> {}", &photo.og_path.display(), e);

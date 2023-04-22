@@ -1,6 +1,6 @@
 use clap::Parser;
 use glob::glob;
-use photodb::photo::is_image_file;
+use photodb::util::is_image_file;
 use rayon::prelude::*;
 use rexiv2::Metadata;
 use std::path::PathBuf;
