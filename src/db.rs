@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use rusqlite::{named_params, Connection, Result};
 
 use crate::raw_photo::Photo;
@@ -13,7 +15,8 @@ pub fn create_table(con: &mut Connection) {
     }
 }
 
-pub fn is_imported(hash: i128, con: &mut Connection) -> bool {
+pub fn is_imported(hash: i128, database: &PathBuf) -> bool {
+    let con : Connection = Connection::open(database).expect("conn failed");
     let mut stmt = con.prepare("SELECT * FROM photodb WHERE hash = :hash").expect("conn failed");
     let mut rows = stmt.query(named_params! { ":hash": hash }).expect("rows failed");
     let row = rows.next().expect("query failed");
@@ -23,13 +26,14 @@ pub fn is_imported(hash: i128, con: &mut Connection) -> bool {
     };
 }
 
-pub fn insert_file_to_db(metadata: &Photo, conn: &mut Connection) -> Result<()> {
-    let mut stmt = conn.prepare(
-            "INSERT INTO photodb (hash, original_path, imported_path, year, month, model) VALUES (:hash, :og_path, :imprt_path, :year, :month, :model)").unwrap();
+pub fn insert_file_to_db(metadata: &Photo, database: &PathBuf) -> Result<()> {
+    let con : Connection = Connection::open(database).expect("conn failed");
+    let mut stmt = con.prepare(
+            "INSERT INTO photodb (hash, original_path, imported_path, year, month, model) VALUES (:hash, :og_path, :db_path, :year, :month, :model)").unwrap();
     stmt.execute(named_params! {
         ":hash": metadata.hash,
         ":og_path" : metadata.og_path.to_str().unwrap(),
-        ":imprt_path" : metadata.db_path.to_str().unwrap(),
+        ":db_path" : metadata.db_path.to_str().unwrap(),
         ":year" : metadata.year,
         ":month" : metadata.month,
         ":model" : metadata.model,

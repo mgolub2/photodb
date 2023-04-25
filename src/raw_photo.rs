@@ -5,12 +5,15 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use chrono::Datelike;
-use core::slice;
-use std::{error::Error, path::PathBuf};
+use rexiv2::Metadata;
+use core::{slice};
+use std::{path::PathBuf};
 use xxhash_rust::xxh3::Xxh3;
 
 use crate::util::get_date;
+use crate::photodb_error::PhotoDBError;
 const SEED: u64 = 0xdeadbeef;
+
 
 pub struct Photo {
     pub hash: i128,
@@ -23,59 +26,60 @@ pub struct Photo {
 }
 
 impl Photo {
-    pub fn new(buf: &[u8], og_path: &PathBuf, db_root: &PathBuf) -> Result<Self, Box<dyn Error>> {
+    pub fn new(buf: &[u8], og_path: &PathBuf, db_root: &PathBuf) -> Result<Self, PhotoDBError> {
         let libraw_data = unsafe { libraw_init(0) };
-        let raw_data = Self::read_raw_data(libraw_data, buf)?;
+        let raw_data = Self::read_raw_data(libraw_data, buf, og_path)?;
         let hash = Self::get_hash(&raw_data);
-        let make = Self::get_model(libraw_data);
+        let model = Self::get_model(libraw_data);
+        let exif = Self::get_exif(buf, og_path);
+        let exif_model = Self::get_exif_model(&exif);
+        let date_tuple = Self::get_date_tuple(&exif); //.unwrap()) } else {(0, 0)};
+        let final_model = if exif_model.is_empty() {model} else {exif_model};
+        let import_path_full = Self::build_final_path(db_root, &final_model, &date_tuple.0,&date_tuple.1, &hash);
         unsafe { libraw_close(libraw_data) };
         Ok(Self {
             hash: hash,
             year: 0,
             month: 0,
-            model: make,
+            model: final_model,
             db_root: db_root.to_path_buf(),
-            db_path: PathBuf::new(),
+            db_path: import_path_full.to_path_buf(),
             og_path: og_path.to_path_buf(),
         })
     }
 
-    pub fn populate_exif_info(&mut self, buf: &[u8]) {
-        let exif = match rexiv2::Metadata::new_from_buffer(&buf) {
-            Ok(exif) => Some(exif),
-            Err(e) => {
-                println!("Warning: error reading exif data {} -> {}", self.og_path.display(), e);
-                None
-            }
-        };
+    fn build_final_path(db_root: &PathBuf, model: &String, year: &i32, month: &u32, hash: &i128) -> PathBuf {
+        db_root
+            .join(year.to_string())
+            .join(month.to_string())
+            .join(model.to_string())
+            .join(hash.to_string())
+    }
 
-        let exif_model: String = exif
-            .as_ref()
-            .and_then(|ex| ex.get_tag_string("Exif.Image.Model").ok())
-            .unwrap_or("".to_string())
-            .replace("\"", "")
-            .replace(",", "")
-            .trim()
-            .to_string();
+    fn get_exif_model(exif: &Result<Metadata, PhotoDBError>) -> String {
+        match exif { 
 
-        let date_tuple = exif
-            .as_ref()
-            .and_then(|exif| get_date(&exif))
-            .and_then(|d| Some((d.year(), d.month())))
-            .unwrap_or((0, 0));
+            Ok(exif) => {
+                let model = exif.get_tag_string("Exif.Image.Model");
+                match model {
+                    Ok(model) => model.replace("\"", "")
+                    .replace(",", "")
+                    .trim()
+                    .to_string(),
+                    Err(_) => "".to_string(),
+                }
+            },
+            Err(_) => "".to_string(),
+        }
+    }
 
-        let import_path_full = self
-            .db_root
-            .join(date_tuple.0.to_string())
-            .join(date_tuple.1.to_string())
-            .join(exif_model.to_string())
-            .join(self.og_path.file_name().unwrap().to_str().unwrap());
-        self.month = date_tuple.1;
-        self.year = date_tuple.0;
-        self.db_path = import_path_full;
-        if !exif_model.is_empty() {
-            self.model = exif_model
-        };
+    fn get_date_tuple(exifrs: &Result<Metadata, PhotoDBError>) -> (i32, u32) {
+        match exifrs {
+            Ok(exif) => get_date(&exif)
+                .and_then(|d| Some((d.year(), d.month())))
+                .unwrap_or((0, 0)),
+            Err(_) => (0, 0)
+        }
     }
 
     fn get_model(libraw_data: *mut libraw_data_t) -> String {
@@ -96,8 +100,8 @@ impl Photo {
     }
 
     fn read_raw_data(
-        libraw_data: *mut libraw_data_t, buf: &[u8],
-    ) -> Result<Vec<u16>, Box<dyn Error>> {
+        libraw_data: *mut libraw_data_t, buf: &[u8], og_path: &PathBuf
+    ) -> Result<Vec<u16>, PhotoDBError> {
         match unsafe { libraw_open_buffer(libraw_data, buf.as_ptr() as *const _, buf.len()) } {
             LibRaw_errors_LIBRAW_SUCCESS => match unsafe { libraw_unpack(libraw_data) } {
                 LibRaw_errors_LIBRAW_SUCCESS => {
@@ -112,9 +116,18 @@ impl Photo {
                     raw_data.extend_from_slice(raw_image_slice);
                     Ok(raw_data)
                 }
-                _ => Err("libraw_unpack failed".into()),
+                _ => Err(PhotoDBError::new("libraw_unpack failed", og_path)),
             },
-            _ => Err("libraw_open_buffer failed".into()),
+            _ => Err(PhotoDBError::new("libraw_open_buffer failed", og_path)),
+        }
+    }
+
+    fn get_exif(buf: &[u8], og_path: &PathBuf) -> Result<rexiv2::Metadata, PhotoDBError> {
+        match rexiv2::Metadata::new_from_buffer(&buf) {
+            Ok(exif) => Ok(exif),
+            Err(e) => Err(PhotoDBError::new(format!("unable to read exif data: {}", e).as_str(), og_path))
         }
     }
 }
+//format!("reading file: {}", e).as_str(), &path
+
