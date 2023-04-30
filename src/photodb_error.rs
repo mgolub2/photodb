@@ -1,4 +1,4 @@
-use std::{path::PathBuf, error::Error, fmt};
+use std::{error::Error, fmt, path::PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct PhotoDBError {
@@ -8,7 +8,7 @@ pub struct PhotoDBError {
 
 impl PhotoDBError {
     pub fn new(msg: &str, path: &PathBuf) -> PhotoDBError {
-        PhotoDBError{details: msg.to_string(), path: path.to_path_buf()}
+        PhotoDBError { details: msg.to_string(), path: path.to_path_buf() }
     }
 }
 

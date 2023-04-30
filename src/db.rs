@@ -16,7 +16,7 @@ pub fn create_table(con: &mut Connection) {
 }
 
 pub fn is_imported(hash: i128, database: &PathBuf) -> bool {
-    let con : Connection = Connection::open(database).expect("conn failed");
+    let con: Connection = Connection::open(database).expect("conn failed");
     let mut stmt = con.prepare("SELECT * FROM photodb WHERE hash = :hash").expect("conn failed");
     let mut rows = stmt.query(named_params! { ":hash": hash }).expect("rows failed");
     let row = rows.next().expect("query failed");
@@ -27,7 +27,7 @@ pub fn is_imported(hash: i128, database: &PathBuf) -> bool {
 }
 
 pub fn insert_file_to_db(metadata: &Photo, database: &PathBuf) -> Result<()> {
-    let con : Connection = Connection::open(database).expect("conn failed");
+    let con: Connection = Connection::open(database).expect("conn failed");
     let mut stmt = con.prepare(
             "INSERT INTO photodb (hash, original_path, imported_path, year, month, model) VALUES (:hash, :og_path, :db_path, :year, :month, :model)").unwrap();
     stmt.execute(named_params! {
