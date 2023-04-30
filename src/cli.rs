@@ -11,16 +11,13 @@ pub struct Cli {
     pub mode: Mode,
     /// The database root to move files into
     #[clap(long, default_value = "photodb")]
-    pub import_path: PathBuf,
+    pub db_root: PathBuf,
     /// Move the files to the database root
     #[clap(short, long, default_value_t = false)]
     pub move_files: bool,
     /// Import the files into the database, checking for duplicates
     #[clap(short, long, default_value_t = false)]
     pub insert: bool,
-    /// The name of the database to use
-    #[clap(short, long, default_value = ".photodb/photo.db")]
-    pub database: PathBuf,
     /// Create the database
     #[clap(short, long, default_value_t = false)]
     pub create: bool,

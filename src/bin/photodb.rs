@@ -1,6 +1,6 @@
 extern crate photodb;
 use clap::Parser;
-use photodb::cli;
+use photodb::{cli, raw_photo::exit};
 use photodb::cli::Mode;
 use photodb::db;
 use photodb::photodb_error::PhotoDBError;
@@ -20,19 +20,65 @@ fn import_directory(
 ) {
     if !path_to_import.is_dir() {
         println!("{} is not a directory", path_to_import.display());
-        //return Err("Not a directory".into());
+        unsafe { exit(1) };
     }
-    let options: MatchOptions = Default::default();
 
+    let img_files = get_img_file_list(path_to_import);
+    let total_files = img_files.len();
+    println!("Importing {} files", total_files);
+    let photo_vec = get_photos_from_img_file_list(&img_files, import_path);
+    let hashed =  &photo_vec.len();
+    println!("Hashed {}/{} files", hashed, total_files);
+    let copy_list: Vec<Photo> = photo_vec.into_iter().filter(|photo| {
+        !db::is_imported(photo.hash, database)
+    })
+    .filter_map(|photo| {
+        if insert {
+            db::insert_file_to_db(&photo,  database).map_err(|e| {
+                println!("{}", PhotoDBError::new(format!("inserting file: {}", e).as_str(), &photo.og_path));
+            }).ok().and_then(|_| {
+                println!("inserted file: {} -> {}", photo.og_path.display(), photo.hash);
+                Some(photo)
+            })
+        } else {
+            println!("mock inserted file: {} -> {}", photo.og_path.display(), photo.db_path.display());
+            Some(photo)
+        }
+    }).collect();
+    println!("{}/{} files to copy", copy_list.len(), total_files);
+    let copied: u64;
+    if move_file {
+        copied = copy_list.par_iter().map(|photo| {
+            fs::copy(&photo.og_path, &photo.db_path).map_err(|e| {
+                println!("{}", PhotoDBError::new(format!("copying file: {}", e).as_str(), &photo.og_path));
+                return 0;
+            }).ok();
+            println!("copied file: {} -> {}", &photo.og_path.display(), &photo.db_path.display());
+            1
+        }).collect::<Vec<u64>>().par_iter().sum();
+        println!("Copied {}/{} files", copied, copy_list.len());
+    }
+    else {
+        copied = copy_list.par_iter().map(|photo| {
+            println!("mock copied file: {} -> {}", &photo.og_path.display(), &photo.db_path.display());
+            1
+        }).collect::<Vec<u64>>().par_iter().sum();
+    }
+    println!("Copied {}/{} files", copied, copy_list.len());
+
+}
+
+fn get_img_file_list(path_to_import: &PathBuf) -> Vec<PathBuf> {
+    let options: MatchOptions = Default::default();
     let img_files: Vec<_> =
         glob_with(path_to_import.join("**/*").as_os_str().to_str().expect("join"), options).unwrap()
             .filter_map(|x| x.ok())
             .filter_map(|path| is_image_file(&path).then_some(path))
             .collect();
+    img_files
+}
 
-    let total_files = img_files.len();
-    println!("Importing {} files", total_files);
-    //let imported_count: (u64, u64, u64) = img_files
+fn get_photos_from_img_file_list(img_files: &Vec<PathBuf>, import_path: &PathBuf) -> Vec<Photo> {
     let photo_vec: Vec<Photo> = img_files
         .par_iter()
         .filter_map(|path| {
@@ -44,76 +90,8 @@ fn import_directory(
             //Some(Photo::new(&buf, &path, import_path))   
         })
         .collect();
-    let copy_list: Vec<Photo> = photo_vec.into_iter().filter(|photo| {
-        !db::is_imported(photo.hash, database)
-    })
-    .filter_map(|photo| {
-        if insert {
-            db::insert_file_to_db(&photo,  database).map_err(|e| {
-                println!("{}", PhotoDBError::new(format!("inserting file: {}", e).as_str(), &photo.og_path));
-            }).ok().and_then(|_| {
-                Some(photo)
-            })
-        } else {
-            Some(photo)
-        }
-    }).collect();
-    if move_file {
-        copy_list.par_iter().for_each(|photo| {
-            fs::copy(&photo.og_path, &photo.db_path).map_err(|e| {
-                println!("{}", PhotoDBError::new(format!("copying file: {}", e).as_str(), &photo.og_path));
-            }).ok();
-        });
-    }
-        // .reduce(|| (0, 0, 0), |(a, b, c), (d, e, f)| (a + d, b + e, c + f));
-    //Ok((total_files as u64, imported_count.0, imported_count.1, imported_count.2))
+    photo_vec
 }
-
-//Ok(mut raw_photo) => {
-                    //raw_photo.populate_exif_info(&buf);
-                    //let mut conn = Connection::open(database).unwrap();
-                    //let mut do_move = move_file;
-                    // if !db::is_imported(raw_photo.hash, &mut conn) {
-                    //     raw_photo
-                    // }
-                        // let inserted = match insert {
-                        //     true => match db::insert_file_to_db(&raw_photo, &mut conn) {
-                        //         Ok(_) => true,
-                        //         Err(e) => {
-                        //             println!("Error: inserting image {} -> {}", path.display(), e);
-                        //             do_move = false;
-                        //             false
-                        //         }
-                        //     },
-                        //     false => true,
-                        // };
-                        // let moved = match do_move {
-                        //     true => match write_to_path(buf.clone().as_mut(), &raw_photo.db_path) {
-                        //         Ok(_) => true,
-                        //         Err(e) => {
-                        //             println!("Error: moving image {} -> {}", path.display(), e);
-                        //             false
-                        //         }
-                        //     },
-                        //     false => inserted,
-                        // };
-                        // println!("{} -> {}", path.display(), raw_photo.db_path.display());
-                        //return ((inserted && moved) as u64, 0, !(inserted && moved) as u64);
-                    // } else {
-                    //     println!(
-                    //         "Image already imported: {} -> {:#x}",
-                    //         path.display(),
-                    //         raw_photo.hash
-                    //     );
-                    //     continue;
-                    // }
-                    //Ok(raw_photo)
-                //}
-                //Err(e) => {
-                    //println!("Error: unable to hash file: {} -> {}", path.display(), e);
-                    //return Err(e);
-                    //return (0, 0, 1);
-                //}
 
 fn verify_db(database: &PathBuf) {
     let conn = Connection::open(database).unwrap();
@@ -167,40 +145,24 @@ fn verify_db(database: &PathBuf) {
 
 fn main() {
     let args = cli::Cli::parse();
-
+    let db_path = &args.db_root.join(".photodb").join("photodb.sqlite");
     if args.create {
-        // create the path if it doesn't exist
-        if !args.database.exists() {
-            fs::create_dir_all(&args.database.parent().unwrap()).unwrap();
-        }
-        let mut conn = Connection::open(&args.database).unwrap();
+        fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        let mut conn = Connection::open(db_path).unwrap();
         db::create_table(&mut conn);
     }
     match &args.mode {
         Mode::Import { path } => {
             import_directory(
                     &path.clone().expect("path"),
-                    &args.import_path,
+                    &args.db_root,
                     args.move_files,
                     args.insert,
-                    &args.database,
+                    db_path,
             )
-            // match import_directory(
-            //     &path.clone().expect("path"),
-            //     &args.import_path,
-            //     args.move_files,
-            //     args.insert,
-            //     &args.database,
-            // ) {
-            //     Ok(v) => println!(
-            //         "Imported {}/{} files. {} already imported. {} errors.",
-            //         v.1, v.0, v.2, v.3
-            //     ),
-            //     Err(e) => println!("Error importing files: {}", e),
-            // }
         }
         Mode::Verify => {
-            verify_db(&args.database);
+            verify_db(db_path);
         }
     }
     0;

@@ -35,7 +35,7 @@ impl Photo {
         let exif_model = Self::get_exif_model(&exif);
         let date_tuple = Self::get_date_tuple(&exif); //.unwrap()) } else {(0, 0)};
         let final_model = if exif_model.is_empty() {model} else {exif_model};
-        let import_path_full = Self::build_final_path(db_root, &final_model, &date_tuple.0,&date_tuple.1, &hash);
+        let import_path_full = Self::build_final_path(db_root, &final_model, &date_tuple.0,&date_tuple.1, &og_path);
         unsafe { libraw_close(libraw_data) };
         Ok(Self {
             hash: hash,
@@ -48,12 +48,12 @@ impl Photo {
         })
     }
 
-    fn build_final_path(db_root: &PathBuf, model: &String, year: &i32, month: &u32, hash: &i128) -> PathBuf {
+    fn build_final_path(db_root: &PathBuf, model: &String, year: &i32, month: &u32, og_path: &PathBuf) -> PathBuf {
         db_root
             .join(year.to_string())
             .join(month.to_string())
             .join(model.to_string())
-            .join(hash.to_string())
+            .join(og_path.file_name().unwrap())
     }
 
     fn get_exif_model(exif: &Result<Metadata, PhotoDBError>) -> String {
