@@ -65,6 +65,21 @@ fn import_directory(
         copied = copy_list
             .par_iter()
             .map(|photo| {
+                //check if photo.db_path exists, create it if it does not
+                if !photo.db_path.parent().unwrap().exists() {
+                    fs::create_dir_all(photo.db_path.parent().unwrap())
+                        .map_err(|e| {
+                            println!(
+                                "{}",
+                                PhotoDBError::new(
+                                    format!("creating directory: {}", e).as_str(),
+                                    &photo.og_path
+                                )
+                            );
+                            return 0;
+                        })
+                        .ok();
+                }
                 fs::copy(&photo.og_path, &photo.db_path)
                     .map_err(|e| {
                         println!(
