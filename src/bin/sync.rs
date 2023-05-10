@@ -60,6 +60,7 @@ fn main() {
     //print the list of missing photos:
     for photo in missing1 {
         println!("\t{}", photo.db_path.display());
+        println!("\t{:?}", photo);
         //test if the file exists in the second database:
         let filename = args
             .db2

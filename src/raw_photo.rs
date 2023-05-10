@@ -48,8 +48,8 @@ impl Photo {
         unsafe { libraw_close(libraw_data) };
         Ok(Self {
             hash: hash,
-            year: 0,
-            month: 0,
+            year: date_tuple.0,
+            month: date_tuple.1,
             model: final_model,
             db_root: db_root.to_path_buf(),
             db_path: import_path_full.to_path_buf(),
