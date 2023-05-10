@@ -1,9 +1,8 @@
 extern crate photodb;
 use clap::Parser;
 use photodb::cli::Mode;
-use photodb::db;
 use photodb::photodb_error::PhotoDBError;
-use photodb::util;
+use photodb::{build_config_path, db, util};
 use photodb::{cli, raw_photo::exit};
 
 use glob::{glob_with, MatchOptions};
@@ -204,10 +203,10 @@ fn verify_db(database: &PathBuf) {
 
 fn main() {
     let args = cli::Cli::parse();
-    let db_path = &args.db_root.join(".photodb").join("photodb.sqlite");
+    let db_path = build_config_path(&args.db_root);
     if args.create {
         fs::create_dir_all(db_path.parent().unwrap()).unwrap();
-        let mut conn = Connection::open(db_path).unwrap();
+        let mut conn = Connection::open(&db_path).unwrap();
         db::create_table(&mut conn);
     }
     match &args.mode {
@@ -216,10 +215,10 @@ fn main() {
             &args.db_root,
             args.move_files,
             args.insert,
-            db_path,
+            &db_path,
         ),
         Mode::Verify => {
-            verify_db(db_path);
+            verify_db(&db_path);
         }
     }
     0;

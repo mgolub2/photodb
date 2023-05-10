@@ -14,6 +14,7 @@ use crate::photodb_error::PhotoDBError;
 use crate::util::get_date;
 const SEED: u64 = 0xdeadbeef;
 
+#[derive(Hash, Clone, Debug)]
 pub struct Photo {
     pub hash: i128,
     pub year: i32,
@@ -23,6 +24,14 @@ pub struct Photo {
     pub db_path: PathBuf,
     pub og_path: PathBuf,
 }
+
+impl PartialEq for Photo {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+impl Eq for Photo {}
 
 impl Photo {
     pub fn new(buf: &[u8], og_path: &PathBuf, db_root: &PathBuf) -> Result<Self, PhotoDBError> {
