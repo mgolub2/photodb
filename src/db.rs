@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use rusqlite::{named_params, Connection, Result};
 
@@ -45,4 +45,22 @@ pub fn insert_file_to_db_con(metadata: &Photo, con: &Connection) -> Result<()> {
         ":model" : metadata.model,
     })?;
     Ok(())
+}
+
+pub fn get_photos(con1: &Connection) -> HashSet<Photo> {
+    let mut stmt = con1.prepare("SELECT * FROM photodb").unwrap();
+    stmt.query_map([], |row| {
+        Ok(Photo {
+            hash: row.get(0)?,
+            og_path: PathBuf::from(row.get::<_, String>(1)?),
+            db_root: PathBuf::new(),
+            db_path: PathBuf::from(row.get::<_, String>(2)?),
+            year: row.get(3)?,
+            month: row.get(4)?,
+            model: row.get(5)?,
+        })
+    })
+    .unwrap()
+    .collect::<Result<HashSet<_>, _>>()
+    .unwrap()
 }

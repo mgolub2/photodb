@@ -1,9 +1,8 @@
 extern crate photodb;
 use clap::Parser;
-use photodb::cli::Mode;
 use photodb::photodb_error::PhotoDBError;
+use photodb::raw_photo::exit;
 use photodb::{build_config_path, db, util};
-use photodb::{cli, raw_photo::exit};
 
 use glob::{glob_with, MatchOptions};
 use photodb::raw_photo::Photo;
@@ -12,6 +11,27 @@ use rusqlite::*;
 use std::{fs, path::PathBuf};
 
 use crate::util::is_image_file;
+
+/// Simple photo database management tool. Pixel content based depduplication via xxhash and libraw.
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+#[command(propagate_version = true)]
+pub struct Cli {
+    /// The database root to move files into
+    #[clap(long, default_value = "photodb")]
+    pub db_root: PathBuf,
+    /// Move the files to the database root
+    #[clap(short, long, default_value_t = false)]
+    pub move_files: bool,
+    /// Import the files into the database, checking for duplicates
+    #[clap(short, long, default_value_t = false)]
+    pub insert: bool,
+    /// Create the database
+    #[clap(short, long, default_value_t = false)]
+    pub create: bool,
+    /// The path to the file or directory to read
+    path: PathBuf,
+}
 
 fn import_directory(
     path_to_import: &PathBuf, import_path: &PathBuf, move_file: bool, insert: bool,
@@ -151,75 +171,13 @@ fn get_photos_from_img_file_list(img_files: &Vec<PathBuf>, import_path: &PathBuf
     photo_vec
 }
 
-fn verify_db(database: &PathBuf) {
-    let conn = Connection::open(database).unwrap();
-    let mut stmt = conn.prepare("SELECT * FROM photodb").unwrap();
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(Photo {
-                hash: row.get(0)?,
-                og_path: PathBuf::from(row.get::<_, String>(1)?),
-                db_root: PathBuf::new(),
-                db_path: PathBuf::from(row.get::<_, String>(2)?),
-                year: row.get(3)?,
-                month: row.get(4)?,
-                model: row.get(5)?,
-            })
-        })
-        .unwrap();
-    let photos = rows.collect::<Result<Vec<_>, _>>().unwrap();
-    photos.par_iter().for_each(|photo| match photo.db_path.exists() {
-        true => {
-            let hash = match fs::read(&photo.db_path) {
-                Ok(buf) => match Photo::new(&buf, &photo.og_path, &photo.db_root) {
-                    Ok(raw_image) => raw_image.hash,
-                    Err(e) => {
-                        println!("Error: calculating hash {} -> {}", &photo.og_path.display(), e);
-                        0
-                    }
-                },
-                Err(e) => {
-                    println!("Error: reading file {} -> {}", &photo.og_path.display(), e);
-                    0
-                }
-            };
-            if hash != photo.hash {
-                println!(
-                    "Error: hash mismatch on {} -> {:#x} file != {:#x} db",
-                    &photo.db_path.display(),
-                    hash,
-                    photo.hash
-                );
-            } else {
-                println!("Verified: {} -> {:#x}", photo.db_path.display(), hash);
-            }
-        }
-        false => {
-            println!("Error: file not found {} -> ???", photo.db_path.display());
-        }
-    });
-    println!("Done verifying {} photos", photos.len());
-}
-
 fn main() {
-    let args = cli::Cli::parse();
+    let args = Cli::parse();
     let db_path = build_config_path(&args.db_root);
     if args.create {
         fs::create_dir_all(db_path.parent().unwrap()).unwrap();
         let mut conn = Connection::open(&db_path).unwrap();
         db::create_table(&mut conn);
     }
-    match &args.mode {
-        Mode::Import { path } => import_directory(
-            &path.clone().expect("path"),
-            &args.db_root,
-            args.move_files,
-            args.insert,
-            &db_path,
-        ),
-        Mode::Verify => {
-            verify_db(&db_path);
-        }
-    }
-    0;
+    import_directory(&args.path, &args.db_root, args.move_files, args.insert, &db_path)
 }

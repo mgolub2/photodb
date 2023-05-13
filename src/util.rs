@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
+use rusqlite::Connection;
 use std::{
     ffi::OsStr,
     fs,
@@ -63,4 +64,19 @@ pub fn write_to_path(buf: &mut Vec<u8>, path: &PathBuf) -> Result<(), std::io::E
             return Err(e);
         }
     }
+}
+
+pub fn build_final_path(
+    db_root: &PathBuf, model: &String, year: &i32, month: &u32, og_path: &PathBuf,
+) -> PathBuf {
+    db_root
+        .join(year.to_string())
+        .join(month.to_string())
+        .join(model.to_string())
+        .join(og_path.file_name().unwrap())
+}
+
+pub fn get_db_con(db_path: &PathBuf) -> Connection {
+    let con: Connection = Connection::open(db_path).expect("conn failed");
+    return con;
 }

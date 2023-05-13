@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use db::DB_PATH;
 
-pub mod cli;
 pub mod db;
 pub mod photodb_error;
 pub mod raw_photo;

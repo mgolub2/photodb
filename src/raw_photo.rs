@@ -7,14 +7,15 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 use chrono::Datelike;
 use core::slice;
 use rexiv2::Metadata;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use xxhash_rust::xxh3::Xxh3;
 
 use crate::photodb_error::PhotoDBError;
-use crate::util::get_date;
+use crate::util::{build_final_path, get_date};
 const SEED: u64 = 0xdeadbeef;
 
-#[derive(Hash, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Photo {
     pub hash: i128,
     pub year: i32,
@@ -33,6 +34,12 @@ impl PartialEq for Photo {
 
 impl Eq for Photo {}
 
+impl Hash for Photo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
+    }
+}
+
 impl Photo {
     pub fn new(buf: &[u8], og_path: &PathBuf, db_root: &PathBuf) -> Result<Self, PhotoDBError> {
         let libraw_data = unsafe { libraw_init(0) };
@@ -44,7 +51,7 @@ impl Photo {
         let date_tuple = Self::get_date_tuple(&exif); //.unwrap()) } else {(0, 0)};
         let final_model = if exif_model.is_empty() { model } else { exif_model };
         let import_path_full =
-            Self::build_final_path(db_root, &final_model, &date_tuple.0, &date_tuple.1, &og_path);
+            build_final_path(db_root, &final_model, &date_tuple.0, &date_tuple.1, &og_path);
         unsafe { libraw_close(libraw_data) };
         Ok(Self {
             hash: hash,
@@ -55,16 +62,6 @@ impl Photo {
             db_path: import_path_full.to_path_buf(),
             og_path: og_path.to_path_buf(),
         })
-    }
-
-    fn build_final_path(
-        db_root: &PathBuf, model: &String, year: &i32, month: &u32, og_path: &PathBuf,
-    ) -> PathBuf {
-        db_root
-            .join(year.to_string())
-            .join(month.to_string())
-            .join(model.to_string())
-            .join(og_path.file_name().unwrap())
     }
 
     fn get_exif_model(exif: &Result<Metadata, PhotoDBError>) -> String {
@@ -136,4 +133,3 @@ impl Photo {
         }
     }
 }
-//format!("reading file: {}", e).as_str(), &path
