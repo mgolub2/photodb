@@ -1,8 +1,9 @@
 extern crate photodb;
 use clap::Parser;
+use photodb::db::build_config_path;
 use photodb::photodb_error::PhotoDBError;
 use photodb::raw_photo::exit;
-use photodb::{build_config_path, db, util};
+use photodb::{db, util};
 
 use glob::{glob_with, MatchOptions};
 use photodb::raw_photo::Photo;

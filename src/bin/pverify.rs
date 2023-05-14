@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 use glob::{glob_with, MatchOptions};
-use photodb::{build_config_path, raw_photo::Photo};
+use photodb::{db::build_config_path, raw_photo::Photo};
 use rayon::prelude::*;
 use rusqlite::Connection;
 
@@ -12,10 +12,8 @@ use rusqlite::Connection;
 #[command(propagate_version = true)]
 pub struct Cli {
     /// The database root to move files into
-    #[clap(long, default_value = "photodb")]
+    #[clap(long)]
     pub db_root: PathBuf,
-    /// The path to the file or directory to read
-    path: PathBuf,
     /// Mode to run in. Hash or File
     #[arg(value_enum)]
     mode: Mode,

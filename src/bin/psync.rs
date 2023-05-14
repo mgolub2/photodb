@@ -2,8 +2,7 @@ use std::{fs, io, path::PathBuf};
 
 use clap::Parser;
 use photodb::{
-    build_config_path,
-    db::{self, get_photos},
+    db::{self, build_config_path, get_photos},
     raw_photo::Photo,
     util::{build_final_path, get_db_con},
 };

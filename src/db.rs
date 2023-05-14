@@ -5,6 +5,11 @@ use rusqlite::{named_params, Connection, Result};
 use crate::raw_photo::Photo;
 
 pub const DB_PATH: &str = "photodb.sqlite";
+pub const CONFIG_ROOT: &str = ".photodb";
+
+pub fn build_config_path(db_root: &PathBuf) -> PathBuf {
+    db_root.join(CONFIG_ROOT).join(DB_PATH)
+}
 
 pub fn create_table(con: &mut Connection) {
     let query = "

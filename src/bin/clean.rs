@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use photodb::{build_config_path, raw_photo::Photo, util::get_db_con};
+use photodb::{db::build_config_path, raw_photo::Photo, util::get_db_con};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
