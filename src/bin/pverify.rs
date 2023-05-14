@@ -12,7 +12,6 @@ use rusqlite::Connection;
 #[command(propagate_version = true)]
 pub struct Cli {
     /// The database root to move files into
-    #[clap(long)]
     pub db_root: PathBuf,
     /// Mode to run in. Hash or File
     #[arg(value_enum)]
