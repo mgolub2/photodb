@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use photodb::{db::build_config_path, raw_photo::Photo, util::get_db_con};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -39,14 +40,19 @@ fn main() {
         .unwrap();
     println!("Found {} matches", matches.len());
     //Delete the original paths from the filesystem:
-    for path in matches {
-        assert!(path.db_path.exists());
-        print!("Deleting {}...\t", path.og_path.display());
-        if args.delete {
-            std::fs::remove_file(path.og_path).expect("failed to delete file");
+    matches.par_iter().for_each(|db_row| {
+        let db_path = db_row.db_path.clone();
+        let og_path = db_row.og_path.clone();
+        assert!(db_path.exists());
+        print!("Deleting {}...\t", og_path.display());
+        if !og_path.exists() {
+            println!("already deleted");
+        }
+        else if args.delete {
+            std::fs::remove_file(og_path).expect("failed to delete file");
             println!("done");
         } else {
             println!("fake done");
         }
-    }
+    });
 }
