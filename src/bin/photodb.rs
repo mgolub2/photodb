@@ -2,13 +2,13 @@ extern crate photodb;
 use clap::Parser;
 use photodb::db::build_config_path;
 use photodb::photodb_error::PhotoDBError;
-use photodb::raw_photo::exit;
 use photodb::{db, util};
 
 use glob::{glob_with, MatchOptions};
 use photodb::raw_photo::Photo;
 use rayon::prelude::*;
 use rusqlite::*;
+use std::process::exit;
 use std::{fs, path::PathBuf};
 
 use crate::util::is_image_file;
@@ -40,7 +40,7 @@ fn import_directory(
 ) {
     if !path_to_import.is_dir() {
         println!("{} is not a directory", path_to_import.display());
-        unsafe { exit(1) };
+        exit(1);
     }
 
     let img_files = get_img_file_list(path_to_import);

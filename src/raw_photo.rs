@@ -1,15 +1,10 @@
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
 use chrono::Datelike;
 use core::slice;
 use rexiv2::Metadata;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use xxhash_rust::xxh3::Xxh3;
+use libraw_rs_vendor::{libraw_data_t, libraw_init, libraw_close, libraw_unpack, libraw_open_buffer};
 
 use crate::photodb_error::PhotoDBError;
 use crate::util::{build_final_path, get_date};
