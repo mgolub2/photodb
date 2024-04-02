@@ -14,9 +14,12 @@ diesel::table! {
         hash -> BigInt,
         original_path -> Text,
         current_path -> Text,
-        exif_date -> Integer,
         exif_json -> Text,
+        exif_date -> BigInt,
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(duplicates, photos,);
+diesel::allow_tables_to_appear_in_same_query!(
+    duplicates,
+    photos,
+);

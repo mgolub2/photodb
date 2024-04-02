@@ -9,7 +9,7 @@ pub struct Photo {
     pub hash: i64,
     pub original_path: String,
     pub current_path: String,
-    pub exif_date: i32,
+    pub exif_date: i64,
     pub exif_json: String,
 }
 
