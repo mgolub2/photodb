@@ -32,7 +32,7 @@ pub fn get_date(exif: &rexiv2::Metadata) -> Option<DateTime<Utc>> {
             EXIF_DATE_F_STR
                 .iter()
                 .find_map(|f| parse_from_str(date.as_str(), *f).ok())
-                .and_then(|date| Some(DateTime::from_utc(date, Utc)))
+                .and_then(|date| Some(DateTime::from_naive_utc_and_offset(date, Utc)))
         }) {
             Some(date) => return Some(date),
             None => continue,

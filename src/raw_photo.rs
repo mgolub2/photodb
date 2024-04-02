@@ -3,11 +3,14 @@
 
 use chrono::Datelike;
 use core::slice;
+use libraw_rs_vendor::{
+    libraw_close, libraw_data_t, libraw_init, libraw_open_buffer, libraw_unpack,
+    LibRaw_errors_LIBRAW_SUCCESS,
+};
 use rexiv2::Metadata;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use xxhash_rust::xxh3::Xxh3;
-use libraw_rs_vendor::{libraw_data_t, libraw_init, libraw_close, libraw_unpack, libraw_open_buffer, LibRaw_errors_LIBRAW_SUCCESS};
 
 use crate::photodb_error::PhotoDBError;
 use crate::util::{build_final_path, get_date};
@@ -75,8 +78,8 @@ impl Photo {
         }
     }
 
-    fn get_date_tuple(exifrs: &Result<Metadata, PhotoDBError>) -> (i32, u32) {
-        match exifrs {
+    fn get_date_tuple(exif_rs: &Result<Metadata, PhotoDBError>) -> (i32, u32) {
+        match exif_rs {
             Ok(exif) => get_date(&exif).and_then(|d| Some((d.year(), d.month()))).unwrap_or((0, 0)),
             Err(_) => (0, 0),
         }

@@ -1,6 +1,6 @@
 [package]
 name = "photodb"
-version = "1.8.0"
+version = "2.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 chrono = "0.4.24"
 clap = { version = "4.0", features = ["derive"] }
+diesel = { version = "2.1.0", features = ["sqlite", "serde_json", "r2d2"] }
+diesel_migrations = { version = "2.1.0", features = ["sqlite"] }
+dotenvy = "0.15.7"
 glob = "0.3.1"
-kamadak-exif = "0.5.5"
 libraw_rs_vendor = "1.0.0"
 rayon = "1.7.0"
 rexiv2 = { version = "0.10.0", features = ["raw-tag-access"] }

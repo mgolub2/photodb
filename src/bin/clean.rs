@@ -47,8 +47,7 @@ fn main() {
         print!("Deleting {}...\t", og_path.display());
         if !og_path.exists() {
             println!("already deleted");
-        }
-        else if args.delete {
+        } else if args.delete {
             std::fs::remove_file(og_path).expect("failed to delete file");
             println!("done");
         } else {

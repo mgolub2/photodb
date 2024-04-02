@@ -13,7 +13,7 @@ use std::{fs, path::PathBuf};
 
 use crate::util::is_image_file;
 
-/// Simple photo database management tool. Pixel content based depduplication via xxhash and libraw.
+/// Simple photo database management tool. Pixel content based de-duplication via xxhash and libraw.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]

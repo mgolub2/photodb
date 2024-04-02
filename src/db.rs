@@ -1,71 +1,43 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
 
-use rusqlite::{named_params, Connection, Result};
+use diesel::prelude::*;
+use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::Pool;
+use dotenvy::dotenv;
+use std::env;
 
-use crate::raw_photo::Photo;
+use crate::models::Photo;
 
-pub const DB_PATH: &str = "photodb.sqlite";
-pub const CONFIG_ROOT: &str = ".photodb";
-
-pub fn build_config_path(db_root: &PathBuf) -> PathBuf {
-    db_root.join(CONFIG_ROOT).join(DB_PATH)
+pub fn get_connection_pool() -> Pool<ConnectionManager<SqliteConnection>> {
+    dotenv().ok();
+    let url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let manager = ConnectionManager::<SqliteConnection>::new(url);
+    // Refer to the `r2d2` documentation for more methods to use
+    // when building a connection pool
+    Pool::builder().test_on_check_out(true).build(manager).expect("Could not build connection pool")
 }
 
-pub fn create_table(con: &mut Connection) {
-    let query = "
-    CREATE TABLE photodb (hash BLOB UNIQUE, original_path TEXT, imported_path TEXT UNIQUE, year INTEGER, month INTEGER, model TEXT);
-";
-
-    match con.execute(query, ()) {
-        Ok(_) => println!("Created database table for photodb."),
-        Err(e) => println!("Error: creating table: {}", e),
-    }
+pub fn is_imported(hash: i64, pool: &Pool<ConnectionManager<SqliteConnection>>) -> bool {
+    use crate::schema::photos;
+    let mut conn = pool.get().unwrap();
+    let results = photos::table
+        .filter(photos::hash.eq(hash))
+        .limit(1)
+        .load::<Photo>(&mut *conn)
+        .expect("Error loading photos");
+    !results.is_empty()
 }
 
-pub fn is_imported(hash: i128, database: &PathBuf) -> bool {
-    let con: Connection = Connection::open(database).expect("conn failed");
-    let mut stmt = con.prepare("SELECT * FROM photodb WHERE hash = :hash").expect("conn failed");
-    let mut rows = stmt.query(named_params! { ":hash": hash }).expect("rows failed");
-    let row = rows.next().expect("query failed");
-    return match row {
-        Some(_) => true,
-        None => false,
-    };
+pub fn insert_file_to_db(
+    photo: &Photo, pool: &Pool<ConnectionManager<SqliteConnection>>,
+) -> Result<usize, diesel::result::Error> {
+    use crate::schema::photos::dsl::*;
+    let mut conn = pool.get().unwrap();
+    diesel::insert_into(photos).values(photo).execute(&mut *conn)
 }
 
-pub fn insert_file_to_db(metadata: &Photo, database: &PathBuf) -> Result<()> {
-    let con: Connection = Connection::open(database).expect("conn failed");
-    insert_file_to_db_con(metadata, &con)
-}
-
-pub fn insert_file_to_db_con(metadata: &Photo, con: &Connection) -> Result<()> {
-    let mut stmt = con.prepare(
-            "INSERT INTO photodb (hash, original_path, imported_path, year, month, model) VALUES (:hash, :og_path, :db_path, :year, :month, :model)").unwrap();
-    stmt.execute(named_params! {
-        ":hash": metadata.hash,
-        ":og_path" : metadata.og_path.to_str().unwrap(),
-        ":db_path" : metadata.db_path.to_str().unwrap(),
-        ":year" : metadata.year,
-        ":month" : metadata.month,
-        ":model" : metadata.model,
-    })?;
-    Ok(())
-}
-
-pub fn get_photos(con1: &Connection) -> HashSet<Photo> {
-    let mut stmt = con1.prepare("SELECT * FROM photodb").unwrap();
-    stmt.query_map([], |row| {
-        Ok(Photo {
-            hash: row.get(0)?,
-            og_path: PathBuf::from(row.get::<_, String>(1)?),
-            db_root: PathBuf::new(),
-            db_path: PathBuf::from(row.get::<_, String>(2)?),
-            year: row.get(3)?,
-            month: row.get(4)?,
-            model: row.get(5)?,
-        })
-    })
-    .unwrap()
-    .collect::<Result<HashSet<_>, _>>()
-    .unwrap()
+pub fn get_photos(pool: &Pool<ConnectionManager<SqliteConnection>>) -> HashSet<Photo> {
+    use crate::schema::photos::dsl::*;
+    let mut conn = pool.get().unwrap();
+    photos.load::<Photo>(&mut *conn).expect("Error loading photos").into_iter().collect()
 }
